@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Baseline simulation",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "frontier_game",
+      "args": [
+        "--trials",
+        "1000",
+        "--seed",
+        "42"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
