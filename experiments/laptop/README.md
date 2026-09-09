@@ -75,3 +75,50 @@ and Git commit/dirty state (including untracked non-ignored files). A dirty comm
 alone does not identify executed source; no source snapshot is created here.
 `--category test --trials 2` is for a tiny verification run, not research evidence.
 No full adaptive experiment was run as part of implementing this entry point.
+
+## JSON experiments with independent players
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/asymmetric_safety_gap.json
+```
+
+The example uses 1,000 histories; run it manually when ready. Optional `--output`
+must name a new directory; otherwise a fresh `results/experiment-...` is created.
+The existing `safety_gap.py` command keeps its behavior.
+
+Required JSON fields are `name`, `description`, `model`, `trials`, `seed`, and
+`policies`. Optional `category` is `research` (default), `smoke`, or `test`.
+`model` accepts Config's numerical parameters; omitted parameters use current
+model defaults, which are always recorded in full. The checked-in example
+explicitly lists every parameter, including horizon 30 and noise 0.25.
+`trials` must be an integer >= 2 and `seed` a nonnegative integer.
+
+`policies` requires separate lowercase `a` and `b` objects. Each requires `type`
+and `parameters`. Supported types are `fixed` (requires `allocation`) and
+`safety_gap` (defaults: `normal_allocation=0.50`, `cautious_allocation=0.30`,
+`gap_threshold=0.0`). Unknown fields, duplicate keys, unsupported types, and
+invalid values are rejected before output creation or simulation.
+
+Edit `policies.a.parameters` for A and `policies.b.parameters` for B independently.
+For example, change A's `normal_allocation` from 0.60 to 0.65 while leaving B's
+at 0.50. Normal and cautious are alternative **capability** allocations; the
+remaining effort `1-allocation` goes to shared safety. In the example, both
+players choose 0.30 when the pre-transition shared gap is above zero. At zero,
+A chooses 0.60 and B chooses 0.50. These labels impose no extra ordering constraint.
+
+For fixed A against safety-gap B, replace only the `a` object with:
+
+```json
+{"type": "fixed", "parameters": {"allocation": 0.50}}
+```
+
+Outputs are `episodes.csv`, `summary.csv` with existing uncertainty estimates,
+`trajectory.csv` with pre/post state and both chosen allocations, an unchanged
+copy `input_config.json`, and `metadata.json`. Metadata includes input and fully
+resolved configuration, each player's type and parameters, model ID, observation
+assumptions, timestamps/status, versions, and Git commit/dirty-tree provenance.
+Episode seeds use `SeedSequence(seed).spawn(trials)`; metadata maps episode indices
+to spawn keys. The illustrative trajectory uses `seed+1` and is excluded from the
+summary. A dirty commit alone does not identify executed source; no source snapshot
+is created. Two fixed policies retain FG-M001; using either safety-gap policy is
+FG-M002. This runner is experiment infrastructure, not a new scientific model.

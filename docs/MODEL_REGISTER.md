@@ -176,3 +176,16 @@ Tracked changes and untracked non-ignored files both make `code_dirty` true.
 A dirty commit alone does not identify executed source. A source snapshot is
 outside this implementation's scope; such runs have incomplete source provenance.
 Historical metadata and historical commit attribution are unchanged.
+
+## JSON experiment infrastructure
+
+`experiments/laptop/run_experiment.py` adds strict JSON configuration and independent
+A/B policy construction using the existing `fixed` and `safety_gap` rules. This is
+experiment infrastructure support, not a new scientific model version. Two fixed
+policies under the baseline rules remain FG-M001, including configurable numerical
+parameter changes. Runs using either safety-gap policy are FG-M002; their policy
+parameters need not be identical. The runner records the supplied description,
+separate resolved policies, the original JSON, and fully resolved configuration
+alongside existing schema-1 provenance and an explicit episode/trajectory seed
+mapping. Historical outputs and model descriptions are unchanged. The example
+configuration is not evidence of an executed research run.
