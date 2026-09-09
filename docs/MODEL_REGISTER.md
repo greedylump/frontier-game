@@ -1,0 +1,131 @@
+# Frontier Game — model and experiment register
+
+Created 2026-09-09. Proposed repository location: docs/MODEL_REGISTER.md.
+This is a retrospective audit and a lightweight convention for future work.
+It does not modify existing run metadata or certify historical source provenance.
+
+## Three identifiers
+
+- **Model ID** describes the scientific rules and allowed information/behavior.
+- **Code revision** is the Git commit implementing those rules. Record whether
+  uncommitted changes were present; a commit alone cannot identify those changes.
+- **Run ID** identifies a particular experiment, configuration, and random sample.
+
+Changing seeds, trial counts, or an allocation grid creates a new run, not a new
+model. Changing payoff rules, transitions, observations, or allowed policy behavior
+creates a new model ID. A behavior-preserving refactor changes only code revision.
+A defect correction that changes outputs needs an explicit correction note and
+identification of affected runs, even if the intended scientific model is unchanged.
+
+## Model register
+
+| Model ID | Name | Status | Parent | Defining change |
+|---|---|---|---|---|
+| FG-M001 | Fixed-allocation, shared-safety baseline | Implemented; existing runs retrospectively classified | None | Two symmetric players, constant allocations, terminal rank prize |
+
+Allocate FG-M002 only when the next scientific change is actually implemented.
+Do not preassign IDs to a roadmap that may change. For each new model add purpose,
+parent, changed assumptions, retained assumptions, limitations, implementation commit,
+and associated experiment IDs. Preserve the earlier description.
+
+## FG-M001 assumptions
+
+- Two interchangeable players; initial capabilities and shared safety are zero.
+- Each receives one effort unit per period, allocating a fixed fraction a_i to
+  capability and 1-a_i to safety for the whole episode. No adaptation or learning.
+- Capability update: C_i <- C_i + g*a_i*M_i, with independent multipliers
+  M_i=exp(-sigma^2/2 + sigma*Z_i), Z_i standard normal. Mean multiplier is one.
+  Capability is cumulative; shocks are independent across players and periods.
+- Safety update: S <- S + h*((1-a_A)+(1-a_B)). Safety is deterministic,
+  perfectly shared, cumulative, and has no depreciation.
+- After both updates, G=max(0,max(C_A,C_B)-S). Catastrophe probability for that
+  period is 1-exp(-lambda*G). A catastrophe ends the episode and pays -L to both.
+- Otherwise play ends at H. The final capability leader receives V; the other
+  receives zero. Exact equality splits V. No absolute-capability benefit,
+  intermediate reward, discounting, regulation, or enforcement.
+- Policies ignore state. Exact observations and hidden-information behavior are
+  not implemented or tested; do not describe these runs as tests of observability.
+- Full default configuration: H=30, g=1, h=0.6, sigma=0.25, lambda=0.01,
+  V=10, L=50. Units and parameter values are illustrative, not empirical estimates.
+
+Changing configurable parameter values is an experiment within FG-M001; record
+the full configuration, not just deviations from defaults.
+
+## Existing production experiment index
+
+Paths below are relative to the working repository's results directory.
+All entries use 1,000 episodes per scenario and the FG-M001 defaults above.
+
+| Run directory | Question / role | Scenario count |
+|---|---|---:|
+| baseline | Distributed example; not a new independent experiment by virtue of copying | 1 |
+| run-20260907T221553661956Z | Initial individual-policy experiment; exact allocations in metadata | 1 |
+| run-20260908T175500808272Z | Individual-policy experiment; exact allocations in metadata | 1 |
+| run-20260908T180206465128Z | Individual-policy experiment; exact allocations in metadata | 1 |
+| run-20260908T180225574595Z | Individual-policy experiment; exact allocations in metadata | 1 |
+| sweep-20260908T182933631230Z | A allocation sweep against B=0.40 | 9 |
+| sweep-b-20260908T185308546900Z | B allocation sweep against A=0.50 | 14 |
+| triangular-grid-20260908T192435601413Z | Full 0.05 allocation grid, symmetry reduced | 231 |
+
+Single-run metadata stores policies and seed; sweep metadata stores per-scenario
+allocations and seeds. Do not pool repeated configurations blindly: seeds can overlap,
+and copied example results are not additional observations.
+
+Exclude these from scientific conclusions:
+- triangular-grid-smoke-20260908: two episodes per pair, interrupted_or_failed.
+- triangular-grid-smoke-20260908-retry: two episodes per pair, completed smoke check.
+- Files under test-temporary directories, including a ten-episode, H=3 CLI baseline.
+
+The no-productivity-noise 42.8% calculation discussed in conversation was an analytic
+comparison, not one of these saved production runs. Production metadata records
+sigma=0.25, not zero.
+
+## What the audit established and what is missing
+
+Present: numerical configuration, policy allocations, seeds, episode counts,
+Python/package versions. Production runs retain summaries and episode data;
+the audit inspected metadata, not the integrity of every episode file.
+The triangular run also records completion, validation, and timing.
+
+Missing from historical metadata: scientific model ID, source commit, working-tree
+state, and a structured purpose/experiment category. Structural assumptions live in
+the code and docs/model.md rather than an immutable per-run model reference.
+Initial state is hard-coded, not recorded explicitly in those metadata files.
+Package version 0.1.0 alone does not establish identical implementation.
+
+Git inspection found commit 6fbdf5d, "Establish fixed-allocation simulation baseline".
+This identifies a preserved baseline commit, NOT a verified generating commit for
+earlier results. Assign FG-M001 retrospectively with provenance status
+"inferred from metadata, project documentation, and experiment history".
+Do not backfill a historical code hash as if it had been recorded at execution.
+
+## Minimal future metadata additions
+
+Keep existing fields and add:
+- model_id and metadata_schema_version;
+- experiment description and category (research, smoke, test);
+- code_commit and code_dirty;
+- UTC start/end timestamps, status, and run command;
+- explicit initial state and policy type/parameters;
+- observation model ID/settings once observations exist.
+
+Prefer committed source for reference experiments. If code_dirty is true, preserve
+a source snapshot or patch with a hash; recording "dirty" alone is not reproducible.
+Preserve runtime results unchanged. Add historical classifications in this register
+or a separate sidecar catalog, not by silently rewriting old metadata.
+
+## Findings and limitations of FG-M001
+
+The allocation grid supplies exploratory expected-payoff comparisons and candidate
+mutual best responses within the sampled grid. Several asymmetric candidates depend
+on sample ties at zero and ten with no observed rare events. They are not established
+continuous-action equilibria or evidence of convergence by adaptive players.
+Winner-take-all rewards and perfectly shared safety strongly shape these outcomes.
+
+## Storage
+
+Commit this register, model descriptions, scripts, and small curated finding tables.
+Bulk results may remain ignored by Git, but then GitHub does not back them up.
+Keep a separate backup of the full results directories, including metadata and raw
+episodes. A catalog provides traceability; it does not preserve the data it references.
+No database, experiment-tracking service, or new dependency is needed at this scale.
