@@ -1,0 +1,727 @@
+{
+  "description": "Captured from unmodified engine before per-period policy changes; small regression fixture, not a research run.",
+  "cases": [
+    {
+      "config": {
+        "horizon": 30,
+        "capability_rate": 1.0,
+        "safety_rate": 0.6,
+        "noise": 0.25,
+        "hazard_scale": 0.01,
+        "first_mover_value": 10.0,
+        "catastrophe_cost": 50.0
+      },
+      "a": 0.8,
+      "b": 0.4,
+      "seed": 7,
+      "result": {
+        "steps": 30,
+        "catastrophe": true,
+        "capability_a": 21.42651848922465,
+        "capability_b": 12.493061963730245,
+        "safety": 14.400000000000002,
+        "payoff_a": -50.0,
+        "payoff_b": -50.0,
+        "history": [
+          {
+            "step": 1,
+            "capability_a": 0.7756250853563154,
+            "capability_b": 0.4177574209809219,
+            "safety": 0.4799999999999999,
+            "gap": 0.29562508535631543,
+            "hazard": 0.002951885446813912,
+            "catastrophe": false
+          },
+          {
+            "step": 2,
+            "capability_a": 1.3962418516902562,
+            "capability_b": 0.7637948172137338,
+            "safety": 0.9599999999999999,
+            "gap": 0.4362418516902563,
+            "hazard": 0.004352916990810045,
+            "catastrophe": false
+          },
+          {
+            "step": 3,
+            "capability_a": 2.18337516496144,
+            "capability_b": 1.3057960947401166,
+            "safety": 1.4399999999999997,
+            "gap": 0.7433751649614402,
+            "hazard": 0.007406189656444913,
+            "catastrophe": false
+          },
+          {
+            "step": 4,
+            "capability_a": 2.8473491720192547,
+            "capability_b": 1.7439959336985418,
+            "safety": 1.9199999999999997,
+            "gap": 0.927349172019255,
+            "hazard": 0.009230625504684977,
+            "catastrophe": false
+          },
+          {
+            "step": 5,
+            "capability_a": 3.6434415962266877,
+            "capability_b": 2.051226205036663,
+            "safety": 2.3999999999999995,
+            "gap": 1.2434415962266883,
+            "hazard": 0.012357428042422751,
+            "catastrophe": false
+          },
+          {
+            "step": 6,
+            "capability_a": 4.5660339895675355,
+            "capability_b": 2.3282659308205416,
+            "safety": 2.8799999999999994,
+            "gap": 1.686033989567536,
+            "hazard": 0.01671899982700015,
+            "catastrophe": false
+          },
+          {
+            "step": 7,
+            "capability_a": 5.048087942204452,
+            "capability_b": 2.6091185689084604,
+            "safety": 3.3599999999999994,
+            "gap": 1.6880879422044526,
+            "hazard": 0.016739195745623492,
+            "catastrophe": false
+          },
+          {
+            "step": 8,
+            "capability_a": 5.7792162331049655,
+            "capability_b": 2.8915265951490556,
+            "safety": 3.8399999999999994,
+            "gap": 1.939216233104966,
+            "hazard": 0.019205343904508832,
+            "catastrophe": false
+          },
+          {
+            "step": 9,
+            "capability_a": 6.585591720535882,
+            "capability_b": 3.2615187531976826,
+            "safety": 4.319999999999999,
+            "gap": 2.265591720535882,
+            "hazard": 0.022401199163068795,
+            "catastrophe": false
+          },
+          {
+            "step": 10,
+            "capability_a": 7.26328073616796,
+            "capability_b": 3.6445395589267946,
+            "safety": 4.799999999999999,
+            "gap": 2.4632807361679614,
+            "hazard": 0.024331895593111972,
+            "catastrophe": false
+          },
+          {
+            "step": 11,
+            "capability_a": 7.792195761488751,
+            "capability_b": 3.988585854371509,
+            "safety": 5.2799999999999985,
+            "gap": 2.5121957614887522,
+            "hazard": 0.02480902718939539,
+            "catastrophe": false
+          },
+          {
+            "step": 12,
+            "capability_a": 8.425627611989531,
+            "capability_b": 4.494030841016971,
+            "safety": 5.759999999999998,
+            "gap": 2.6656276119895335,
+            "hazard": 0.02630413346697434,
+            "catastrophe": false
+          },
+          {
+            "step": 13,
+            "capability_a": 9.194735534812883,
+            "capability_b": 4.977656905444412,
+            "safety": 6.2399999999999975,
+            "gap": 2.954735534812886,
+            "hazard": 0.029115100039872353,
+            "catastrophe": false
+          },
+          {
+            "step": 14,
+            "capability_a": 9.94876861522554,
+            "capability_b": 5.3762059577121395,
+            "safety": 6.719999999999997,
+            "gap": 3.228768615225542,
+            "hazard": 0.03177200377826673,
+            "catastrophe": false
+          },
+          {
+            "step": 15,
+            "capability_a": 10.51960222803622,
+            "capability_b": 5.771349700581681,
+            "safety": 7.199999999999997,
+            "gap": 3.3196022280362234,
+            "hazard": 0.03265108093826547,
+            "catastrophe": false
+          },
+          {
+            "step": 16,
+            "capability_a": 11.04627296099758,
+            "capability_b": 6.251961665657394,
+            "safety": 7.679999999999996,
+            "gap": 3.366272960997584,
+            "hazard": 0.03310244443356676,
+            "catastrophe": false
+          },
+          {
+            "step": 17,
+            "capability_a": 11.706770982921102,
+            "capability_b": 6.891226413019625,
+            "safety": 8.159999999999997,
+            "gap": 3.546770982921105,
+            "hazard": 0.03484610128892845,
+            "catastrophe": false
+          },
+          {
+            "step": 18,
+            "capability_a": 12.281293621455072,
+            "capability_b": 7.286209759933572,
+            "safety": 8.639999999999997,
+            "gap": 3.641293621455075,
+            "hazard": 0.03575795919593511,
+            "catastrophe": false
+          },
+          {
+            "step": 19,
+            "capability_a": 13.020935555609881,
+            "capability_b": 7.746078965766662,
+            "safety": 9.119999999999997,
+            "gap": 3.900935555609884,
+            "hazard": 0.038258288524256626,
+            "catastrophe": false
+          },
+          {
+            "step": 20,
+            "capability_a": 13.937079610869539,
+            "capability_b": 8.301565959409896,
+            "safety": 9.599999999999998,
+            "gap": 4.337079610869541,
+            "hazard": 0.0424437339055188,
+            "catastrophe": false
+          },
+          {
+            "step": 21,
+            "capability_a": 14.752860972811378,
+            "capability_b": 8.646856998499958,
+            "safety": 10.079999999999998,
+            "gap": 4.67286097281138,
+            "hazard": 0.04565363723266817,
+            "catastrophe": false
+          },
+          {
+            "step": 22,
+            "capability_a": 15.329123363123182,
+            "capability_b": 8.982278900363191,
+            "safety": 10.559999999999999,
+            "gap": 4.7691233631231835,
+            "hazard": 0.04657187182513164,
+            "catastrophe": false
+          },
+          {
+            "step": 23,
+            "capability_a": 16.29985756631584,
+            "capability_b": 9.498492198717315,
+            "safety": 11.04,
+            "gap": 5.259857566315841,
+            "hazard": 0.05123920827820371,
+            "catastrophe": false
+          },
+          {
+            "step": 24,
+            "capability_a": 16.935541281307284,
+            "capability_b": 9.954240370795493,
+            "safety": 11.52,
+            "gap": 5.415541281307284,
+            "hazard": 0.05271512514593006,
+            "catastrophe": false
+          },
+          {
+            "step": 25,
+            "capability_a": 17.626147135185,
+            "capability_b": 10.332618037723783,
+            "safety": 12.0,
+            "gap": 5.6261471351850005,
+            "hazard": 0.054708063186545315,
+            "catastrophe": false
+          },
+          {
+            "step": 26,
+            "capability_a": 18.547379870483415,
+            "capability_b": 10.689859240637464,
+            "safety": 12.48,
+            "gap": 6.067379870483414,
+            "hazard": 0.058869812403986775,
+            "catastrophe": false
+          },
+          {
+            "step": 27,
+            "capability_a": 19.275752577617304,
+            "capability_b": 11.257277610423163,
+            "safety": 12.96,
+            "gap": 6.315752577617303,
+            "hazard": 0.061204422461308465,
+            "catastrophe": false
+          },
+          {
+            "step": 28,
+            "capability_a": 19.99445085712512,
+            "capability_b": 11.680696433185306,
+            "safety": 13.440000000000001,
+            "gap": 6.5544508571251185,
+            "hazard": 0.063442638998085,
+            "catastrophe": false
+          },
+          {
+            "step": 29,
+            "capability_a": 20.73252233299025,
+            "capability_b": 11.974143643755557,
+            "safety": 13.920000000000002,
+            "gap": 6.812522332990248,
+            "hazard": 0.06585651030557553,
+            "catastrophe": false
+          },
+          {
+            "step": 30,
+            "capability_a": 21.42651848922465,
+            "capability_b": 12.493061963730245,
+            "safety": 14.400000000000002,
+            "gap": 7.0265184892246495,
+            "hazard": 0.06785340406723468,
+            "catastrophe": true
+          }
+        ]
+      },
+      "next_random": 0.876218808109271
+    },
+    {
+      "config": {
+        "horizon": 30,
+        "capability_rate": 1.0,
+        "safety_rate": 0.6,
+        "noise": 0.25,
+        "hazard_scale": 0.01,
+        "first_mover_value": 10.0,
+        "catastrophe_cost": 50.0
+      },
+      "a": 0.5,
+      "b": 0.5,
+      "seed": 142,
+      "result": {
+        "steps": 30,
+        "catastrophe": false,
+        "capability_a": 15.555337295153798,
+        "capability_b": 14.711049467576446,
+        "safety": 18.0,
+        "payoff_a": 10.0,
+        "payoff_b": 0.0,
+        "history": [
+          {
+            "step": 1,
+            "capability_a": 0.44831528535135323,
+            "capability_b": 0.27645791116885754,
+            "safety": 0.6,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 2,
+            "capability_a": 1.053221889805328,
+            "capability_b": 0.7826634131886112,
+            "safety": 1.2,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 3,
+            "capability_a": 1.4035382058597585,
+            "capability_b": 1.2743440991215547,
+            "safety": 1.7999999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 4,
+            "capability_a": 1.8374818504870916,
+            "capability_b": 1.722156137768935,
+            "safety": 2.4,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 5,
+            "capability_a": 2.229890519170858,
+            "capability_b": 2.2579826353001637,
+            "safety": 3.0,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 6,
+            "capability_a": 2.8883903142367435,
+            "capability_b": 2.6851383236191113,
+            "safety": 3.6,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 7,
+            "capability_a": 3.392317175655382,
+            "capability_b": 3.3002391865400007,
+            "safety": 4.2,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 8,
+            "capability_a": 3.8244806771908157,
+            "capability_b": 3.901154065783846,
+            "safety": 4.8,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 9,
+            "capability_a": 4.461266586614361,
+            "capability_b": 4.42905023157707,
+            "safety": 5.3999999999999995,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 10,
+            "capability_a": 4.909649714894398,
+            "capability_b": 4.827165952580611,
+            "safety": 5.999999999999999,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 11,
+            "capability_a": 5.825985159171673,
+            "capability_b": 5.342040931673884,
+            "safety": 6.599999999999999,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 12,
+            "capability_a": 6.372114902082247,
+            "capability_b": 5.997819938126202,
+            "safety": 7.199999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 13,
+            "capability_a": 6.890689263314407,
+            "capability_b": 6.4616683705051745,
+            "safety": 7.799999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 14,
+            "capability_a": 7.468872595456012,
+            "capability_b": 6.9640859027485575,
+            "safety": 8.399999999999999,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 15,
+            "capability_a": 7.859304098677905,
+            "capability_b": 7.577745248005744,
+            "safety": 8.999999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 16,
+            "capability_a": 8.539558034252273,
+            "capability_b": 7.776598031457505,
+            "safety": 9.599999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 17,
+            "capability_a": 8.86997165504752,
+            "capability_b": 8.309031692503705,
+            "safety": 10.199999999999998,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 18,
+            "capability_a": 9.360204769074718,
+            "capability_b": 8.966799573225842,
+            "safety": 10.799999999999997,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 19,
+            "capability_a": 10.083431396476138,
+            "capability_b": 9.399809022963977,
+            "safety": 11.399999999999997,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 20,
+            "capability_a": 10.694434994970148,
+            "capability_b": 10.022637817721774,
+            "safety": 11.999999999999996,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 21,
+            "capability_a": 11.067667969866413,
+            "capability_b": 10.603229631407894,
+            "safety": 12.599999999999996,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 22,
+            "capability_a": 11.573612764276636,
+            "capability_b": 10.974311424772754,
+            "safety": 13.199999999999996,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 23,
+            "capability_a": 11.846981487108089,
+            "capability_b": 11.504061322033976,
+            "safety": 13.799999999999995,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 24,
+            "capability_a": 12.640539427833328,
+            "capability_b": 12.254332110187633,
+            "safety": 14.399999999999995,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 25,
+            "capability_a": 13.15568606537601,
+            "capability_b": 12.648748414477051,
+            "safety": 14.999999999999995,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 26,
+            "capability_a": 13.68180688656458,
+            "capability_b": 13.222782027546627,
+            "safety": 15.599999999999994,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 27,
+            "capability_a": 14.033242122821957,
+            "capability_b": 13.576474970006036,
+            "safety": 16.199999999999996,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 28,
+            "capability_a": 14.584935815463762,
+            "capability_b": 14.029483737596792,
+            "safety": 16.799999999999997,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 29,
+            "capability_a": 15.009499588162166,
+            "capability_b": 14.454739089945,
+            "safety": 17.4,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 30,
+            "capability_a": 15.555337295153798,
+            "capability_b": 14.711049467576446,
+            "safety": 18.0,
+            "gap": 0.0,
+            "hazard": 0.0,
+            "catastrophe": false
+          }
+        ]
+      },
+      "next_random": 0.4305368927693648
+    },
+    {
+      "config": {
+        "horizon": 3,
+        "capability_rate": 1.0,
+        "safety_rate": 0.6,
+        "noise": 0,
+        "hazard_scale": 0,
+        "first_mover_value": 10.0,
+        "catastrophe_cost": 50.0
+      },
+      "a": 1.0,
+      "b": 0.0,
+      "seed": 1,
+      "result": {
+        "steps": 3,
+        "catastrophe": false,
+        "capability_a": 3.0,
+        "capability_b": 0.0,
+        "safety": 1.7999999999999998,
+        "payoff_a": 10.0,
+        "payoff_b": 0.0,
+        "history": [
+          {
+            "step": 1,
+            "capability_a": 1.0,
+            "capability_b": 0.0,
+            "safety": 0.6,
+            "gap": 0.4,
+            "hazard": -0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 2,
+            "capability_a": 2.0,
+            "capability_b": 0.0,
+            "safety": 1.2,
+            "gap": 0.8,
+            "hazard": -0.0,
+            "catastrophe": false
+          },
+          {
+            "step": 3,
+            "capability_a": 3.0,
+            "capability_b": 0.0,
+            "safety": 1.7999999999999998,
+            "gap": 1.2000000000000002,
+            "hazard": -0.0,
+            "catastrophe": false
+          }
+        ]
+      },
+      "next_random": 0.027559113243068367
+    },
+    {
+      "config": {
+        "horizon": 30,
+        "capability_rate": 1.0,
+        "safety_rate": 0.6,
+        "noise": 0,
+        "hazard_scale": 1000000.0,
+        "first_mover_value": 10.0,
+        "catastrophe_cost": 50.0
+      },
+      "a": 1.0,
+      "b": 1.0,
+      "seed": 2,
+      "result": {
+        "steps": 1,
+        "catastrophe": true,
+        "capability_a": 1.0,
+        "capability_b": 1.0,
+        "safety": 0.0,
+        "payoff_a": -50.0,
+        "payoff_b": -50.0,
+        "history": [
+          {
+            "step": 1,
+            "capability_a": 1.0,
+            "capability_b": 1.0,
+            "safety": 0.0,
+            "gap": 1.0,
+            "hazard": 1.0,
+            "catastrophe": true
+          }
+        ]
+      },
+      "next_random": 0.0919159421350969
+    }
+  ],
+  "trials": [
+    {
+      "trial": 0,
+      "steps": 7,
+      "catastrophe": true,
+      "capability_a": 5.1337226827927696,
+      "capability_b": 2.7393858658543326,
+      "safety": 3.3599999999999994,
+      "payoff_a": -50.0,
+      "payoff_b": -50.0
+    },
+    {
+      "trial": 1,
+      "steps": 24,
+      "catastrophe": true,
+      "capability_a": 18.344287408268144,
+      "capability_b": 9.806444097595936,
+      "safety": 11.52,
+      "payoff_a": -50.0,
+      "payoff_b": -50.0
+    },
+    {
+      "trial": 2,
+      "steps": 30,
+      "catastrophe": false,
+      "capability_a": 24.305954414030907,
+      "capability_b": 12.465065961965324,
+      "safety": 14.400000000000002,
+      "payoff_a": 10.0,
+      "payoff_b": 0.0
+    },
+    {
+      "trial": 3,
+      "steps": 19,
+      "catastrophe": true,
+      "capability_a": 16.13123876358205,
+      "capability_b": 7.864795741708441,
+      "safety": 9.119999999999997,
+      "payoff_a": -50.0,
+      "payoff_b": -50.0
+    }
+  ]
+}

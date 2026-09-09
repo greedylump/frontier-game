@@ -45,3 +45,33 @@ cells reuse data; they are not additional independent simulations. Findings
 are exploratory within this discrete grid. Existing marginal 95% intervals
 do not correct for multiple comparisons or selecting the largest sample mean,
 and these results do not establish a continuous-action equilibrium.
+
+
+## Manual safety-gap experiment (FG-M002)
+
+Run from the repository root when you choose to run this experiment:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/safety_gap.py --trials 1000 --seed 2026 --normal-allocation 0.50 --cautious-allocation 0.30 --gap-threshold 0.0
+```
+
+Both players use separate immutable instances of the same memoryless rule. Each
+is called every surviving period using exact pre-transition information. The
+shared gap exceeds the threshold only for cautious choices; equality selects
+normal. This particular symmetric shared-gap rule gives equal actions even when
+capabilities differ. Productivity shocks remain independent and all model defaults
+are preserved. This is an illustrative policy comparison, not an optimized rule.
+
+The default creates a fresh `results/safety-gap-...` directory. `--output` must
+name a new directory. Files are `episodes.csv`, `summary.csv` with existing
+uncertainty intervals, `metadata.json`, and `trajectory.csv`. The illustrative
+trajectory uses `seed + 1` separately and is excluded from the trial summary.
+Trace columns distinguish pre-transition state, allocations, and post-transition
+outcomes; legacy unprefixed state fields are post-transition aliases.
+
+Metadata records FG-M002/schema 1, defaults and zero initial state, policy types
+and parameters, exact-observation assumptions, seeds, timestamps, status, versions,
+and Git commit/dirty state (including untracked non-ignored files). A dirty commit
+alone does not identify executed source; no source snapshot is created here.
+`--category test --trials 2` is for a tiny verification run, not research evidence.
+No full adaptive experiment was run as part of implementing this entry point.

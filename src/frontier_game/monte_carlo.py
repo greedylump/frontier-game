@@ -2,10 +2,10 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import t, norm
-from .model import Config, FixedPolicy, simulate
+from .model import Config, Policy, simulate
 
 
-def run_trials(config: Config, policy_a: FixedPolicy, policy_b: FixedPolicy,
+def run_trials(config: Config, policy_a: Policy, policy_b: Policy,
                trials: int = 1000, seed: int = 42) -> pd.DataFrame:
     if type(trials) is not int or trials < 2:
         raise ValueError("trials must be an integer >= 2 for uncertainty estimates")

@@ -2,8 +2,9 @@
 
 A small Python learning/research project about two-player frontier AI competition.
 Ask: **how does allocating effort to capability versus shared safety change expected
-payoffs and catastrophe frequency under explicit assumptions?** Version 1 evaluates
-fixed policies; it does not solve the dynamic game or predict real-world events.
+payoffs and catastrophe frequency under explicit assumptions?** FG-M001 evaluates
+fixed policies; FG-M002 adds per-period rules with exact observations. Neither
+solves the dynamic game or predicts real-world events.
 
 ## Start in VS Code
 
@@ -30,7 +31,7 @@ Try `--a 0.4 --b 0.4`, then `--a 0.8 --b 0.8`. See `--help` for all flags.
 
 ## Where to read and work
 
-- `src/frontier_game/model.py`: parameters, fixed policies, one episode.
+- `src/frontier_game/model.py`: parameters, immutable observations, policies, one episode.
 - `src/frontier_game/monte_carlo.py`: independent replications and uncertainty.
 - `src/frontier_game/cli.py`: experiment outputs.
 - `tests/`: model boundary cases and reproducibility checks.
@@ -43,3 +44,7 @@ Try `--a 0.4 --b 0.4`, then `--a 0.8 --b 0.8`. See `--help` for all flags.
 Use modules for machinery and notebooks for questions. No GPU, cloud, or RL setup
 is needed. Dependencies have lower bounds for installation flexibility; save an
 environment snapshot for any result you intend to publish (see workflow).
+
+
+For the manual adaptive entry point, see [laptop experiments](experiments/laptop/README.md).
+The existing CLI and fixed-allocation scripts remain FG-M001 compatibility runs.

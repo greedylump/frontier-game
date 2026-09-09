@@ -22,8 +22,9 @@ identification of affected runs, even if the intended scientific model is unchan
 | Model ID | Name | Status | Parent | Defining change |
 |---|---|---|---|---|
 | FG-M001 | Fixed-allocation, shared-safety baseline | Implemented; existing runs retrospectively classified | None | Two symmetric players, constant allocations, terminal rank prize |
+| FG-M002 | Per-period policies with exact observations | Implemented; small verification only | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
 
-Allocate FG-M002 only when the next scientific change is actually implemented.
+Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
 parent, changed assumptions, retained assumptions, limitations, implementation commit,
 and associated experiment IDs. Preserve the earlier description.
@@ -129,3 +130,49 @@ Bulk results may remain ignored by Git, but then GitHub does not back them up.
 Keep a separate backup of the full results directories, including metadata and raw
 episodes. A catalog provides traceability; it does not preserve the data it references.
 No database, experiment-tracking service, or new dependency is needed at this scale.
+
+
+## FG-M002: per-period policies with exact observations
+
+Purpose: permit a deterministic rule to choose capability allocation at the start
+of every surviving period. Parent: FG-M001. The allowed behavior and the
+policy/observation interface change; physical transitions, payoff rules, default
+parameters (including productivity noise), and zero initial state do not change.
+
+`Observation` is immutable and exact. Periods are indexed 1 through H. Each player
+receives its own capability, the opponent's capability, and shared safety, all
+from the same pre-transition state. Both observations are constructed before
+policy evaluation. Neither contains the opponent's current action or policy,
+mutable state, or future random draws. Both policies are called each period,
+including period 1; validated choices are applied simultaneously before the
+existing catastrophe draw. No calls occur after catastrophe.
+
+`SafetyGapPolicy` is deterministic and memoryless: compute
+G=max(0,max(own_capability,opponent_capability)-shared_safety). Choose 0.30 when
+G>0, otherwise 0.50 by default. The two allocations and nonnegative threshold
+are configurable. Equality with the threshold selects the normal allocation.
+Two separate immutable instances with identical parameters choose the same action
+because this rule uses a shared gap, even if capabilities differ. Independent
+productivity shocks can still produce different capability growth. Other rules
+using relative position can choose different actions with identical parameters.
+
+Limitations: no noisy/delayed observations, learning, optimization, policy memory,
+or equilibrium claim. Custom policies must obey the memoryless interface;
+`run_trials` reuses instances and does not reset arbitrary user-defined state.
+Fixed-policy compatibility runs retain their FG-M001 scientific interpretation.
+The FG-M001 assumptions above describe the historical baseline, not a claim that
+exact observations remain unimplemented in the current machinery.
+
+Implementation revision: uncommitted working-tree changes at introduction; no
+new implementation commit is claimed. Associated entry point:
+`experiments/laptop/safety_gap.py`. No research experiment was executed for this
+implementation; tiny temporary verification runs are category `test`.
+Each future run's output directory name is its run ID.
+
+New metadata schema version 1 records FG-M002, numerical configuration, initial
+state, both policy types/parameters, observation assumptions, trial and illustrative
+trajectory seeds, UTC timestamps, status, package versions, and Git provenance.
+Tracked changes and untracked non-ignored files both make `code_dirty` true.
+A dirty commit alone does not identify executed source. A source snapshot is
+outside this implementation's scope; such runs have incomplete source provenance.
+Historical metadata and historical commit attribution are unchanged.

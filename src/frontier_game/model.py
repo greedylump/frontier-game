@@ -1,6 +1,8 @@
-"""A finite-horizon game with simultaneous fixed allocations and shared safety."""
+"""A finite-horizon game with simultaneous per-period allocations and shared safety."""
 from dataclasses import dataclass, asdict
 import math
+from numbers import Real
+from typing import Protocol
 import numpy as np
 
 
@@ -22,29 +24,91 @@ class Config:
                 raise ValueError(f"{name} must be finite and nonnegative")
 
 
+@dataclass(frozen=True, slots=True)
+class Observation:
+    """Exact pre-transition values; period is 1-based, from 1 through horizon."""
+    period: int
+    horizon: int
+    own_capability: float
+    opponent_capability: float
+    shared_safety: float
+
+
+class Policy(Protocol):
+    """Deterministic, memoryless decision rule; do not retain episode state.
+
+    run_trials reuses policy instances. Built-in policies are immutable.
+    """
+    def choose_allocation(self, observation: Observation) -> float: ...
+
+
+def make_observations(period: int, horizon: int, capability_a: float,
+                      capability_b: float, safety: float) -> tuple[Observation, Observation]:
+    """Build both player views before either policy is evaluated."""
+    return (Observation(period, horizon, capability_a, capability_b, safety),
+            Observation(period, horizon, capability_b, capability_a, safety))
+
+
+def validate_allocation(value: float) -> float:
+    if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+            or not math.isfinite(value) or not 0 <= value <= 1):
+        raise ValueError("allocation must be a finite real number in [0, 1]")
+    return float(value)
+
+
 @dataclass(frozen=True)
 class FixedPolicy:
-    """Fraction of one unit of effort devoted to capability every period."""
+    """Return the same capability allocation each period, ignoring observation."""
     allocation: float
 
     def __post_init__(self):
-        if not math.isfinite(self.allocation) or not 0 <= self.allocation <= 1:
-            raise ValueError("allocation must be in [0, 1]")
+        validate_allocation(self.allocation)
+
+    def choose_allocation(self, observation: Observation) -> float:
+        return self.allocation
 
 
-def simulate(config: Config, policy_a: FixedPolicy, policy_b: FixedPolicy,
+@dataclass(frozen=True)
+class SafetyGapPolicy:
+    """Identical configurations choose identical actions from the shared gap."""
+    normal_allocation: float = 0.50
+    cautious_allocation: float = 0.30
+    gap_threshold: float = 0.0
+
+    def __post_init__(self):
+        validate_allocation(self.normal_allocation)
+        validate_allocation(self.cautious_allocation)
+        if (isinstance(self.gap_threshold, (bool, np.bool_))
+                or not isinstance(self.gap_threshold, Real)
+                or not math.isfinite(self.gap_threshold) or self.gap_threshold < 0):
+            raise ValueError("gap_threshold must be finite and nonnegative")
+
+    def choose_allocation(self, observation: Observation) -> float:
+        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
+                  - observation.shared_safety)
+        return self.cautious_allocation if gap > self.gap_threshold else self.normal_allocation
+
+
+def simulate(config: Config, policy_a: Policy, policy_b: Policy,
              rng: np.random.Generator, *, trace: bool = False) -> dict:
     """Run one episode. Randomness belongs to the caller, never global state.
 
-    A trace records post-transition states, including a fatal transition.
+    A trace records pre-transition decisions and post-transition outcomes.
+    Legacy unprefixed state fields remain aliases for post-transition values.
     A winner is paid only if the episode survives the entire horizon.
     """
     capability = np.zeros(2)
     safety = 0.0
-    allocation = np.array([policy_a.allocation, policy_b.allocation])
     history = []
     catastrophe = False
     for step in range(1, config.horizon + 1):
+        observations = make_observations(step, config.horizon, float(capability[0]),
+                                         float(capability[1]), safety)
+        # Both observations already exist; neither decision sees the other's action.
+        chosen_a = policy_a.choose_allocation(observations[0])
+        chosen_b = policy_b.choose_allocation(observations[1])
+        allocation = np.array([validate_allocation(chosen_a), validate_allocation(chosen_b)])
+        # Validation precedes state changes and all random draws.
         # Mean-one lognormal multipliers keep progress nonnegative.
         shock = rng.lognormal(-0.5 * config.noise**2, config.noise, size=2)
         capability += config.capability_rate * allocation * shock
@@ -53,7 +117,17 @@ def simulate(config: Config, policy_a: FixedPolicy, policy_b: FixedPolicy,
         hazard = float(-np.expm1(-config.hazard_scale * gap))
         catastrophe = bool(rng.random() < hazard)
         if trace:
-            history.append(dict(step=step, capability_a=float(capability[0]),
+            history.append(dict(step=step, horizon=config.horizon,
+                                pre_capability_a=observations[0].own_capability,
+                                pre_capability_b=observations[1].own_capability,
+                                pre_safety=observations[0].shared_safety,
+                                pre_gap=max(0.0, max(observations[0].own_capability,
+                                                    observations[1].own_capability)
+                                            - observations[0].shared_safety),
+                                allocation_a=float(allocation[0]), allocation_b=float(allocation[1]),
+                                post_capability_a=float(capability[0]), post_capability_b=float(capability[1]),
+                                post_safety=safety, post_gap=gap, post_hazard=hazard,
+                                post_catastrophe=catastrophe, capability_a=float(capability[0]),
                                 capability_b=float(capability[1]), safety=safety,
                                 gap=gap, hazard=hazard, catastrophe=catastrophe))
         if catastrophe:
