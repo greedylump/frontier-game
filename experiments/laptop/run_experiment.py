@@ -1,5 +1,8 @@
 """Run independently configured fixed, safety-gap, or graduated policies from strict JSON."""
 import argparse
+import csv
+import io
+from itertools import product
 from copy import deepcopy
 import math
 from dataclasses import asdict, fields, MISSING
@@ -10,7 +13,7 @@ from pathlib import Path
 import platform
 import subprocess
 import sys
-from time import perf_counter
+from time import perf_counter, sleep
 
 import numpy as np
 import pandas as pd
@@ -141,27 +144,15 @@ def apply_overrides(document, specifications):
     return effective, records
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, required=True)
-    parser.add_argument('--output', type=Path, help='New directory; refuses to overwrite')
-    parser.add_argument('--set', dest='overrides', action='append', default=[],
-                        metavar='PATH=VALUE', help='Override an existing scalar field; repeatable; VALUE is JSON')
-    args = parser.parse_args(argv)
-    try:
-        source = args.config.read_bytes()
-        document = json.loads(source.decode('utf-8-sig'), object_pairs_hook=unique_object,
-                              parse_constant=reject_constant)
-        effective, overrides = apply_overrides(document, args.overrides)
-        config, policy_a, policy_b, resolved = parse_config(effective)
-    except (OSError, UnicodeError, ValueError) as error:
-        parser.error(f'{args.config}: {error}')
+def execute_experiment(source, document, input_path, overrides, prepared, output,
+                       run_command, provenance, quiet=False):
+    """The same execution and output format for single runs and sweep members."""
+    config, policy_a, policy_b, resolved = prepared
     seed, trials = resolved['seed'], resolved['trials']
-    output = args.output or Path('results') / datetime.now(timezone.utc).strftime('experiment-%Y%m%dT%H%M%S%fZ')
     metadata = dict(model_id=model_id_for(policy_a, policy_b),
                     metadata_schema_version=1, run_id=output.name,
                     experiment_name=resolved['name'], description=resolved['description'], category=resolved['category'],
-                    input_config=document, overrides=overrides, input_config_path=str(args.config.resolve()), resolved_config=resolved,
+                    input_config=document, overrides=overrides, input_config_path=str(input_path.resolve()), resolved_config=resolved,
                     config=asdict(config), initial_state=dict(capability_a=0.0, capability_b=0.0, shared_safety=0.0),
                     policies={side: dict(type=type(policy).__name__, identifier=resolved['policies'][side]['type'],
                                          parameters=asdict(policy)) for side, policy in [('a', policy_a), ('b', policy_b)]},
@@ -177,9 +168,7 @@ def main(argv=None):
                     started_utc=utc_now(), ended_utc=None, status='running',
                     python=platform.python_version(), platform=platform.platform(),
                     versions={p: version(p) for p in ['frontier-game', 'numpy', 'pandas', 'scipy']},
-                    run_command=subprocess.list2cmdline([sys.executable, str(Path(__file__)),
-                                                         *(sys.argv[1:] if argv is None else argv)]),
-                    **code_provenance())
+                    run_command=run_command, **provenance)
     output.mkdir(parents=True, exist_ok=False)
     started = perf_counter()
     save_metadata(output, metadata)
@@ -193,9 +182,11 @@ def main(argv=None):
         trajectory = simulate(config, policy_a, policy_b, np.random.default_rng(seed+1), trace=True)
         pd.DataFrame(trajectory['history']).to_csv(output / 'trajectory.csv', index=False)
         metadata['status'] = 'complete'
-        print(summary.to_string(index=False))
-        print(metadata['source_provenance_note'])
-        print(f'Saved to {output.resolve()}')
+        if not quiet:
+            print(summary.to_string(index=False))
+            print(metadata['source_provenance_note'])
+            print(f'Saved to {output.resolve()}')
+        return summary
     except BaseException as error:
         metadata['status'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'failed'
         metadata['error'] = f'{type(error).__name__}: {error}'
@@ -204,6 +195,178 @@ def main(argv=None):
         metadata['ended_utc'] = utc_now()
         metadata['elapsed_seconds'] = perf_counter() - started
         save_metadata(output, metadata)
+
+
+def sweep_rows(specifications, csv_source=None):
+    """Ordered override lists; the last CLI axis varies fastest."""
+    if csv_source is not None:
+        try:
+            rows = list(csv.reader(io.StringIO(csv_source.decode('utf-8-sig'), newline=''), strict=True))
+        except csv.Error as error:
+            raise ValueError(f'invalid sweep CSV: {error}') from error
+        if not rows or not rows[0] or any(not header.strip() for header in rows[0]):
+            raise ValueError('sweep CSV needs nonblank path headers')
+        headers = rows[0]
+        if len(set(headers)) != len(headers):
+            raise ValueError('duplicate sweep CSV headers')
+        if len(rows) < 2:
+            raise ValueError('sweep CSV needs at least one experiment row')
+        variations = []
+        for index, cells in enumerate(rows[1:], 2):
+            if len(cells) != len(headers) or any(not cell.strip() for cell in cells):
+                raise ValueError(f'sweep CSV row {index}: wrong column count or blank cell')
+            variations.append([f'{path}={cell}' for path, cell in zip(headers, cells)])
+        return variations
+    axes, seen = [], set()
+    for specification in specifications:
+        path, separator, values = specification.partition('=')
+        if not separator or not path or path in seen:
+            raise ValueError(f'invalid or duplicate sweep path: {path!r}')
+        seen.add(path)
+        axis = []
+        for raw in values.split(','):
+            try:
+                value = json.loads(raw, parse_constant=reject_constant)
+            except ValueError as error:
+                raise ValueError(f'--sweep {path}: invalid numeric value: {raw!r}') from error
+            if type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value)):
+                raise ValueError(f'--sweep {path}: values must be finite numbers')
+            axis.append(f'{path}={raw}')
+        axes.append(axis)
+    return [list(values) for values in product(*axes)]
+
+
+def resolve_experiments(document, common, rows):
+    """Preflight every variation independently, without output or RNG activity."""
+    _, common_records = apply_overrides(document, common)
+    fixed_paths = {record['path'] for record in common_records}
+    plans = []
+    for index, row in enumerate(rows, 1):
+        try:
+            _, varied = apply_overrides(document, row)
+            overlap = fixed_paths & {record['path'] for record in varied}
+            if overlap:
+                raise ValueError(f'paths specified in both --set and sweep: {sorted(overlap)}')
+            effective, overrides = apply_overrides(document, [*common, *row])
+            prepared = parse_config(effective)
+        except ValueError as error:
+            raise ValueError(f'Experiment {index}: {error}') from error
+        plans.append(dict(prepared=prepared, overrides=overrides,
+                          varied_parameters={record['path']: record['value'] for record in varied}))
+    return plans
+
+
+def save_manifest(output, manifest):
+    temporary = output / 'manifest.tmp'
+    temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    for attempt in range(10):
+        try:
+            temporary.replace(output / 'manifest.json')
+            return
+        except PermissionError:
+            if attempt == 9:
+                raise
+            sleep(.1)
+
+
+def execute_sweep(source, document, args, plans, csv_source, command, provenance):
+    output = args.output or Path('results') / datetime.now(timezone.utc).strftime('sweep-%Y%m%dT%H%M%S%fZ')
+    manifest = dict(input_config=document, input_config_path=str(args.config.resolve()),
+                    sweep_specification=dict(set=args.overrides, sweep=args.sweep,
+                        sweep_csv=str(args.sweep_csv.resolve()) if args.sweep_csv else None,
+                        csv_text=csv_source.decode('utf-8-sig') if csv_source is not None else None),
+                    run_command=command, started_utc=utc_now(), ended_utc=None, status='running',
+                    completed_experiments=0, total_experiments=len(plans),
+                    total_histories=sum(plan['prepared'][3]['trials'] for plan in plans),
+                    seed_rule='Configured seed retained per variation; trial i uses SeedSequence(seed) child i.',
+                    experiments=[dict(experiment_id=i, output_path=f'{i:04d}', status='pending',
+                        varied_parameters=plan['varied_parameters'], overrides=plan['overrides'],
+                        resolved_config=plan['prepared'][3], seed=plan['prepared'][3]['seed'],
+                        model_id=model_id_for(plan['prepared'][1], plan['prepared'][2]))
+                        for i, plan in enumerate(plans, 1)], **provenance)
+    output.mkdir(parents=True, exist_ok=False)
+    save_manifest(output, manifest)
+    summaries = []
+    active = None
+    try:
+        (output / 'input_config.json').write_bytes(source)
+        if csv_source is not None:
+            (output / 'sweep_input.csv').write_bytes(csv_source)
+        for plan, entry in zip(plans, manifest['experiments']):
+            active = entry
+            entry['status'] = 'running'
+            save_manifest(output, manifest)
+            if not args.quiet:
+                values = ', '.join(f'{path}={json.dumps(value)}' for path, value in plan['varied_parameters'].items())
+                print(f'Experiment {entry["experiment_id"]}/{len(plans)}: {values}', flush=True)
+            summary = execute_experiment(source, document, args.config, plan['overrides'], plan['prepared'],
+                                         output / entry['output_path'], command, provenance, args.quiet)
+            combined = summary.copy()
+            combined.insert(0, 'experiment_id', entry['experiment_id'])
+            for path, value in plan['varied_parameters'].items():
+                combined[f'parameter.{path}'] = value
+            summaries.append(combined)
+            pd.concat(summaries, ignore_index=True).to_csv(output / 'summary.csv', index=False)
+            entry['status'] = 'complete'
+            manifest['completed_experiments'] += 1
+            save_manifest(output, manifest)
+            active = None
+        manifest['status'] = 'complete'
+    except BaseException as error:
+        manifest['status'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'failed'
+        manifest['error'] = f'{type(error).__name__}: {error}'
+        if active is not None:
+            active['status'] = manifest['status']
+            active['error'] = manifest['error']
+            manifest['failed_experiment_id'] = active['experiment_id']
+        raise
+    finally:
+        manifest['ended_utc'] = utc_now()
+        save_manifest(output, manifest)
+        print(f'Completed {manifest["completed_experiments"]}/{len(plans)} experiments; sweep output: {output.resolve()}')
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config', type=Path, required=True)
+    parser.add_argument('--output', type=Path, help='New directory; refuses to overwrite')
+    parser.add_argument('--set', dest='overrides', action='append', default=[], metavar='PATH=VALUE')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--sweep', action='append', default=[], metavar='PATH=V1,V2,...')
+    modes.add_argument('--sweep-csv', type=Path)
+    parser.add_argument('--dry-run', action='store_true', help='Show resolved settings without simulation or output files')
+    parser.add_argument('--quiet', action='store_true', help='Suppress tables and routine progress; retain errors and completion')
+    args = parser.parse_args(argv)
+    try:
+        source = args.config.read_bytes()
+        document = json.loads(source.decode('utf-8-sig'), object_pairs_hook=unique_object, parse_constant=reject_constant)
+        csv_source = args.sweep_csv.read_bytes() if args.sweep_csv else None
+        is_sweep = bool(args.sweep) or args.sweep_csv is not None
+        rows = sweep_rows(args.sweep, csv_source) if is_sweep else [[]]
+        plans = resolve_experiments(document, args.overrides, rows)
+    except (OSError, UnicodeError, ValueError) as error:
+        parser.error(f'{args.config}: {error}')
+    if args.dry_run:
+        print(json.dumps(dict(experiment_count=len(plans),
+            total_histories=sum(plan['prepared'][3]['trials'] for plan in plans),
+            variations=[dict(experiment_id=i, varied_parameters=plan['varied_parameters'],
+                             resolved_config=plan['prepared'][3]) for i, plan in enumerate(plans, 1)]), indent=2))
+        return
+    command = subprocess.list2cmdline([sys.executable, str(Path(__file__)), *(sys.argv[1:] if argv is None else argv)])
+    provenance = code_provenance()
+    try:
+        if is_sweep:
+            execute_sweep(source, document, args, plans, csv_source, command, provenance)
+        else:
+            output = args.output or Path('results') / datetime.now(timezone.utc).strftime('experiment-%Y%m%dT%H%M%S%fZ')
+            plan = plans[0]
+            execute_experiment(source, document, args.config, plan['overrides'], plan['prepared'], output,
+                               command, provenance, args.quiet)
+            if args.quiet:
+                print(f'Completed 1/1 experiments; output: {output.resolve()}')
+    except BaseException as error:
+        print(f'Error: {type(error).__name__}: {error}', file=sys.stderr)
+        raise
 
 
 if __name__ == '__main__':

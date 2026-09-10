@@ -176,3 +176,74 @@ unchanged. Metadata retains the original `input_config`, ordered `overrides`
 records (path, parsed value, and original argument), and final `resolved_config`.
 Without `--set`, overrides are an empty list and numerical behavior is unchanged.
 This is experiment infrastructure; model-ID rules and scientific behavior are unchanged.
+
+## Sequential parameter sweeps
+
+A one-parameter sweep of A's graduated safety response (B and other settings
+remain as specified in the baseline):
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --sweep policies.a.parameters.safety_response=0.05,0.15,0.25
+```
+
+Repeat `--sweep` for a Cartesian grid. Arguments and values keep their supplied
+order; the last axis varies fastest. CLI sweep values must be finite JSON numbers.
+Common `--set` overrides apply to every variation, but a path cannot appear in
+both fixed overrides and a sweep:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set model.safety_rate=0.75 --sweep policies.a.parameters.safety_response=0.05,0.15,0.25 --sweep policies.b.parameters.safety_response=0.10,0.20
+```
+
+Alternatively, create a CSV whose headers are existing scalar configuration paths,
+with one experiment per row. Cells contain JSON scalars; JSON strings must also be
+quoted/escaped according to CSV rules. Blank cells, duplicate headers, malformed
+rows, and invalid settings are rejected. Example `variations.csv`:
+
+```csv
+policies.a.parameters.safety_response,policies.b.parameters.safety_response
+0.05,0.10
+0.15,0.20
+```
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --sweep-csv variations.csv
+```
+
+`--sweep-csv` and `--sweep` are mutually exclusive. CSV row order is retained;
+rows are explicit variations, not a Cartesian product. Paths must exist in the
+original JSON, including any field that otherwise has a default.
+
+Inspect resolved variations and total Monte Carlo histories without simulation or
+creating output files:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --sweep policies.a.parameters.safety_response=0.05,0.15,0.25 --dry-run
+```
+
+`--dry-run` also works for a single run. All configurations are validated before
+any simulation starts. Runs execute sequentially. Seeds are preserved by default,
+so corresponding trial IDs use the same spawned random streams for paired analysis.
+Changing a seed explicitly changes that pairing; different trajectories can consume
+those streams differently. Illustrative trajectories remain excluded from summary
+history counts. No inference of statistical significance follows from a sweep alone.
+
+A fresh `results/sweep-...` directory (or new `--output` path) holds `0001`, `0002`,
+etc., each with the existing single-run files. `manifest.json` records the original
+input, exact sweep specification, ordered resolved variations, seeds, model IDs,
+source provenance, statuses, and relative output paths. CSV bytes are copied to
+`sweep_input.csv` when used. Root `summary.csv` combines completed runs with
+`experiment_id`, varied values in `parameter.<path>` columns, and all existing
+uncertainty columns. It is updated after each experiment. Execution stops on a
+failure; completed outputs remain, and the manifest identifies the failed experiment
+and leaves later experiments pending. Existing output directories are refused.
+
+By default, every experiment prints its index/count and varied values followed by
+its summary table. Add `--quiet` to suppress tables and routine progress, retaining
+errors and a final completed/total count and output directory. Single runs also
+support `--quiet`; their default output remains unchanged. Quiet mode uses the same
+calculations and saved data/schema; recorded invocation, timestamps, and output paths
+naturally reflect the actual run. Dry-run output remains visible even with `--quiet`.
+
+This is experiment infrastructure and does not increment the mathematical model ID.
+Only tiny verification experiments were executed during implementation.
