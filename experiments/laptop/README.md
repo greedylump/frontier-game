@@ -147,3 +147,32 @@ different actions for players in different relative positions.
 This is a prescribed, immutable, memoryless rule, not online optimization.
 The coefficients are illustrative, not optimized. The example requests 1,000
 histories for a manual run; it was not executed during implementation.
+
+## Repeatable command-line overrides
+
+Keep a baseline JSON file and repeat `--set PATH=VALUE` to change existing scalar
+fields for one run. Values use JSON syntax: numeric values stay numeric; strings
+must contain JSON double quotes. Overrides apply to a separate copy before normal
+configuration validation. Paths must exist in the input file, even when the model
+could otherwise supply a default. Unknown or duplicate paths, object/array targets
+or values, malformed JSON, and non-finite numbers are rejected before execution.
+
+Change safety productivity and disable only A's deficit response:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set model.safety_rate=0.75 --set policies.a.parameters.deficit_response=0
+```
+
+Change both players' safety responses independently:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set policies.a.parameters.safety_response=0.30 --set policies.b.parameters.safety_response=0.40
+```
+
+For a tiny check, append `--set trials=2 --set model.horizon=3 --set seed=17`.
+The commands above otherwise retain the baseline trial count. `--output` still
+requires a fresh directory. The source JSON and saved `input_config.json` remain
+unchanged. Metadata retains the original `input_config`, ordered `overrides`
+records (path, parsed value, and original argument), and final `resolved_config`.
+Without `--set`, overrides are an empty list and numerical behavior is unchanged.
+This is experiment infrastructure; model-ID rules and scientific behavior are unchanged.

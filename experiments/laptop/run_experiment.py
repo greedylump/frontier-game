@@ -1,5 +1,7 @@
 """Run independently configured fixed, safety-gap, or graduated policies from strict JSON."""
 import argparse
+from copy import deepcopy
+import math
 from dataclasses import asdict, fields, MISSING
 from datetime import datetime, timezone
 from importlib.metadata import version
@@ -101,16 +103,57 @@ def reject_constant(value):
     raise ValueError(f'invalid JSON numeric constant: {value}')
 
 
+def apply_overrides(document, specifications):
+    """Return a separate input copy and ordered audit records for scalar overrides."""
+    effective = deepcopy(document)
+    records = []
+    seen = set()
+    for specification in specifications:
+        path, separator, raw_value = specification.partition('=')
+        if not separator or not path or any(not part for part in path.split('.')):
+            raise ValueError(f'--set {specification!r}: expected a nonempty PATH=VALUE')
+        if path in seen:
+            raise ValueError(f'--set: duplicate override path: {path}')
+        parts = path.split('.')
+        original = document
+        target = effective
+        for part in parts[:-1]:
+            if not isinstance(original, dict) or part not in original:
+                raise ValueError(f'--set: unknown path: {path}')
+            original = original[part]
+            target = target[part]
+        leaf = parts[-1]
+        if not isinstance(original, dict) or leaf not in original:
+            raise ValueError(f'--set: unknown path: {path}')
+        if isinstance(original[leaf], (dict, list)):
+            raise ValueError(f'--set {path}: target must be an existing scalar field')
+        try:
+            value = json.loads(raw_value, parse_constant=reject_constant)
+        except ValueError as error:
+            raise ValueError(f'--set {path}: invalid JSON value: {error}') from error
+        if isinstance(value, (dict, list)):
+            raise ValueError(f'--set {path}: value must be a JSON scalar')
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError(f'--set {path}: number must be finite')
+        target[leaf] = value
+        seen.add(path)
+        records.append(dict(path=path, value=value, argument=specification))
+    return effective, records
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--output', type=Path, help='New directory; refuses to overwrite')
+    parser.add_argument('--set', dest='overrides', action='append', default=[],
+                        metavar='PATH=VALUE', help='Override an existing scalar field; repeatable; VALUE is JSON')
     args = parser.parse_args(argv)
     try:
         source = args.config.read_bytes()
         document = json.loads(source.decode('utf-8-sig'), object_pairs_hook=unique_object,
                               parse_constant=reject_constant)
-        config, policy_a, policy_b, resolved = parse_config(document)
+        effective, overrides = apply_overrides(document, args.overrides)
+        config, policy_a, policy_b, resolved = parse_config(effective)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(f'{args.config}: {error}')
     seed, trials = resolved['seed'], resolved['trials']
@@ -118,7 +161,7 @@ def main(argv=None):
     metadata = dict(model_id=model_id_for(policy_a, policy_b),
                     metadata_schema_version=1, run_id=output.name,
                     experiment_name=resolved['name'], description=resolved['description'], category=resolved['category'],
-                    input_config=document, input_config_path=str(args.config.resolve()), resolved_config=resolved,
+                    input_config=document, overrides=overrides, input_config_path=str(args.config.resolve()), resolved_config=resolved,
                     config=asdict(config), initial_state=dict(capability_a=0.0, capability_b=0.0, shared_safety=0.0),
                     policies={side: dict(type=type(policy).__name__, identifier=resolved['policies'][side]['type'],
                                          parameters=asdict(policy)) for side, policy in [('a', policy_a), ('b', policy_b)]},
