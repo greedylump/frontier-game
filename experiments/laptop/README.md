@@ -94,7 +94,7 @@ explicitly lists every parameter, including horizon 30 and noise 0.25.
 `trials` must be an integer >= 2 and `seed` a nonnegative integer.
 
 `policies` requires separate lowercase `a` and `b` objects. Each requires `type`
-and `parameters`. Supported types are `fixed` (requires `allocation`) and
+and `parameters`. Supported types are `fixed` (requires `allocation`), `graduated` (see below), and
 `safety_gap` (defaults: `normal_allocation=0.50`, `cautious_allocation=0.30`,
 `gap_threshold=0.0`). Unknown fields, duplicate keys, unsupported types, and
 invalid values are rejected before output creation or simulation.
@@ -120,5 +120,30 @@ assumptions, timestamps/status, versions, and Git commit/dirty-tree provenance.
 Episode seeds use `SeedSequence(seed).spawn(trials)`; metadata maps episode indices
 to spawn keys. The illustrative trajectory uses `seed+1` and is excluded from the
 summary. A dirty commit alone does not identify executed source; no source snapshot
-is created. Two fixed policies retain FG-M001; using either safety-gap policy is
-FG-M002. This runner is experiment infrastructure, not a new scientific model.
+is created. Two fixed policies retain FG-M001; using either safety-gap policy without a graduated policy is
+FG-M002; any graduated policy makes the run FG-M003. This runner is experiment infrastructure, not a new scientific model.
+
+
+## Graduated rule (FG-M003)
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json
+```
+
+The example configures both players independently as `graduated`, with
+`base_allocation=0.60`, `deficit_response=0.10`, and `safety_response=0.20`.
+These are also the policy defaults if parameters are omitted. Edit either
+`policies.a.parameters` or `policies.b.parameters` independently; mixing with
+`fixed` or `safety_gap` is supported.
+
+Allocation is clipped to [0,1] after adding the deficit response
+`deficit_response*(opponent_capability-own_capability)` to the base and
+subtracting `safety_response*gap`. The gap is
+`max(0,max(own_capability,opponent_capability)-shared_safety)`.
+Thus being behind raises capability effort, being ahead lowers it, and a gap
+lowers it; remaining effort goes to safety. Identical parameters can produce
+different actions for players in different relative positions.
+
+This is a prescribed, immutable, memoryless rule, not online optimization.
+The coefficients are illustrative, not optimized. The example requests 1,000
+histories for a manual run; it was not executed during implementation.

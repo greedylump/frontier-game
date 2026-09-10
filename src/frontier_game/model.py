@@ -89,6 +89,33 @@ class SafetyGapPolicy:
         return self.cautious_allocation if gap > self.gap_threshold else self.normal_allocation
 
 
+@dataclass(frozen=True)
+class GraduatedPolicy:
+    """Prescribed, memoryless response to relative capability and the shared gap.
+
+    Defaults are illustrative parameters, not optimized coefficients.
+    """
+    base_allocation: float = 0.60
+    deficit_response: float = 0.10
+    safety_response: float = 0.20
+
+    def __post_init__(self):
+        validate_allocation(self.base_allocation)
+        for name in ('deficit_response', 'safety_response'):
+            value = getattr(self, name)
+            if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+                    or not math.isfinite(value) or value < 0):
+                raise ValueError(f'{name} must be finite and nonnegative')
+
+    def choose_allocation(self, observation: Observation) -> float:
+        deficit = observation.opponent_capability - observation.own_capability
+        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
+                  - observation.shared_safety)
+        allocation = (self.base_allocation + self.deficit_response * deficit
+                      - self.safety_response * gap)
+        return float(np.clip(allocation, 0.0, 1.0))
+
+
 def simulate(config: Config, policy_a: Policy, policy_b: Policy,
              rng: np.random.Generator, *, trace: bool = False) -> dict:
     """Run one episode. Randomness belongs to the caller, never global state.

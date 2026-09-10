@@ -23,6 +23,7 @@ identification of affected runs, even if the intended scientific model is unchan
 |---|---|---|---|---|
 | FG-M001 | Fixed-allocation, shared-safety baseline | Implemented; existing runs retrospectively classified | None | Two symmetric players, constant allocations, terminal rank prize |
 | FG-M002 | Per-period policies with exact observations | Implemented; small verification only | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
+| FG-M003 | Graduated relative-position and safety response | Implemented; small verification only | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
 
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
@@ -183,9 +184,39 @@ Historical metadata and historical commit attribution are unchanged.
 A/B policy construction using the existing `fixed` and `safety_gap` rules. This is
 experiment infrastructure support, not a new scientific model version. Two fixed
 policies under the baseline rules remain FG-M001, including configurable numerical
-parameter changes. Runs using either safety-gap policy are FG-M002; their policy
+parameter changes. Runs using either safety-gap policy without a graduated policy are FG-M002; their policy
 parameters need not be identical. The runner records the supplied description,
 separate resolved policies, the original JSON, and fully resolved configuration
 alongside existing schema-1 provenance and an explicit episode/trajectory seed
 mapping. Historical outputs and model descriptions are unchanged. The example
 configuration is not evidence of an executed research run.
+
+
+## FG-M003: prescribed graduated policy
+
+Purpose: explore a deterministic, memoryless allocation rule that responds to
+relative capability as well as the shared safety gap. Parent: FG-M002. The added
+allowed behavior is `GraduatedPolicy`, selectable as `graduated` for either player.
+No physical transition, payoff, initial state, productivity noise, observation,
+policy-call timing, or existing policy changes. Earlier descriptions are retained.
+
+Given exact pre-transition observations, define deficit=opponent-own and
+G=max(0,max(own,opponent)-shared_safety). The capability allocation is
+clip(base_allocation + deficit_response*deficit - safety_response*G, 0, 1).
+The base must lie in [0,1]; response coefficients must be finite and nonnegative.
+Being behind increases capability effort, being ahead reduces it, and a safety
+gap reduces it. Identical rules may choose different actions when relative
+positions differ. Remaining effort goes to shared safety.
+
+Defaults and example parameters are base=0.60, deficit_response=0.10, and
+safety_response=0.20. These are illustrative, not optimized. This is a prescribed
+rule, not online optimization, learning, or an equilibrium claim. Coefficients do
+not change during an episode; no policy state carries between episodes.
+
+Any run containing a graduated policy is FG-M003, including mixed-policy pairs.
+Without graduated policies, the previous FG-M001/FG-M002 assignments remain.
+The numerical configuration and chosen policy parameters are recorded per run;
+metadata schema remains 1. Implementation revision: current uncommitted changes;
+no new commit or historical provenance is claimed. Associated example:
+`experiments/laptop/configs/graduated.json`, run through `run_experiment.py`.
+Only small verification tests were run at introduction, not a research experiment.

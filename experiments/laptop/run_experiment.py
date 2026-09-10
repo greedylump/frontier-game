@@ -1,4 +1,4 @@
-﻿"""Run independently configured fixed or safety-gap policies from strict JSON."""
+"""Run independently configured fixed, safety-gap, or graduated policies from strict JSON."""
 import argparse
 from dataclasses import asdict, fields, MISSING
 from datetime import datetime, timezone
@@ -12,7 +12,7 @@ from time import perf_counter
 
 import numpy as np
 import pandas as pd
-from frontier_game import Config, FixedPolicy, SafetyGapPolicy, run_trials, simulate, summarize
+from frontier_game import Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy, run_trials, simulate, summarize
 
 # Support both direct script execution and package imports in tests.
 if __package__:
@@ -20,7 +20,15 @@ if __package__:
 else:
     from safety_gap import code_provenance, save_metadata, utc_now
 
-POLICY_TYPES = {'fixed': FixedPolicy, 'safety_gap': SafetyGapPolicy}
+POLICY_TYPES = {'fixed': FixedPolicy, 'safety_gap': SafetyGapPolicy, 'graduated': GraduatedPolicy}
+
+
+def model_id_for(policy_a, policy_b):
+    if any(isinstance(policy, GraduatedPolicy) for policy in (policy_a, policy_b)):
+        return 'FG-M003'
+    if any(isinstance(policy, SafetyGapPolicy) for policy in (policy_a, policy_b)):
+        return 'FG-M002'
+    return 'FG-M001'
 
 
 def check_keys(value, allowed, required, location):
@@ -107,7 +115,7 @@ def main(argv=None):
         parser.error(f'{args.config}: {error}')
     seed, trials = resolved['seed'], resolved['trials']
     output = args.output or Path('results') / datetime.now(timezone.utc).strftime('experiment-%Y%m%dT%H%M%S%fZ')
-    metadata = dict(model_id='FG-M001' if isinstance(policy_a, FixedPolicy) and isinstance(policy_b, FixedPolicy) else 'FG-M002',
+    metadata = dict(model_id=model_id_for(policy_a, policy_b),
                     metadata_schema_version=1, run_id=output.name,
                     experiment_name=resolved['name'], description=resolved['description'], category=resolved['category'],
                     input_config=document, input_config_path=str(args.config.resolve()), resolved_config=resolved,
