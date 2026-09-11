@@ -1,0 +1,277 @@
+# Frontier Game: project state and handoff
+
+Prepared from the research conversation and saved results through run
+`sweep-20260911T031630014001Z`. Intended location: `docs/PROJECT_STATE.md`.
+Read this first when resuming, then consult `MODEL_REGISTER.md`, source, and run
+metadata. Update this file after meaningful decisions or completed experiment batches.
+
+## Goal and working style
+
+Research question: under what modeled conditions and amount of outside pressure
+(regulation, agreements, enforcement) does safer cooperation become individually
+worthwhile and stable against unilateral deviations between competing AI labs?
+Eventually consider leader versus challenger, then more competitors if useful.
+Define cooperation and the allowed deviations explicitly before claiming stability.
+
+This is also a learning project: Python, Monte Carlo, game theory, and compute
+scaling from laptop CPU to local GPU to cloud. Establish an understandable
+unregulated adaptive baseline before introducing regulation. Do not optimize this
+toy model indefinitely or confuse simulator findings with empirical predictions.
+
+The user prefers scientific discussion before implementation, small extensible
+changes, and explicit manual commands for research runs. Do not launch research
+sweeps merely because they appear in this roadmap. Tiny verification runs are fine
+when implementing requested changes. Avoid unnecessary frameworks or GPU/RL stacks.
+The user prefers VS Code to terminal-heavy workflows.
+
+## Repository and context
+
+- Repository: `C:\Dev\Repos\frontier-game`.
+- Package: `src/frontier_game`; experiments: `experiments/laptop`.
+- Main configurable runner: `experiments/laptop/run_experiment.py`.
+- Default adaptive config: `experiments/laptop/configs/graduated.json`.
+- Scientific model history: `docs/MODEL_REGISTER.md`.
+- That register still labels FG-M002/FG-M003 as "small verification only" in its
+  opening table. Extensive research runs now exist; reconcile those stale status
+  descriptions when updating it, without rewriting historical provenance.
+- The discussion session could read the repo but wrote analysis artifacts into
+  `C:\Users\ab294\Documents\Codex\2026-09-07\referenced-chatgpt-conversation-this-is-an\outputs`.
+  Those artifacts are NOT automatically part of the repository. Raw runs below
+  are in the repo's local `results` directory. Ignored results are not necessarily
+  backed up to GitHub.
+
+## Current scientific model: FG-M003
+
+Two symmetric players start with C_A=C_B=S=0. Each period each allocates a fraction
+a_i in [0,1] to capability, and 1-a_i to safety. Decisions are simultaneous from
+exact pre-update observations. Policies cannot observe the opponent's current
+action, future noise, or policy internals.
+
+    C_i' = C_i + g*a_i*M_i
+    M_i = exp(-sigma^2/2 + sigma*Z_i), Z_i ~ Normal(0,1), E[M_i]=1
+    S' = S + h*(2-a_A-a_B)
+    G' = max(0, max(C_A',C_B')-S')
+    catastrophe probability = 1-exp(-lambda*G')
+
+Independent productivity shocks across players and periods. Safety is immediate,
+deterministic, perfectly shared, permanent, and linear in effort. Capability is
+permanent too. Catastrophe is checked AFTER updates and terminates the history.
+
+Defaults: H=30, g=1, h=0.6, sigma=0.25, lambda=0.01, prize V=10,
+catastrophe loss L=50 per player. If no catastrophe, terminal leader gets 10 and
+loser 0; exact tie splits prize. No intermediate reward, discounting, exit option,
+private safety, regulation, or absolute-capability payoff. Parameters are
+illustrative, not calibrated. Horizon is a prize deadline, not just a runtime cap.
+
+Graduated policy:
+
+    a_i = clip(base_allocation + deficit_response*(C_j-C_i)
+               - safety_response*G, 0, 1)
+
+Here G is the pre-update shared gap. Each player has its own three fixed
+coefficients. Default coefficients are 0.6, 0.1, 0.2. The deficit term both boosts
+the laggard AND slows the leader. Coefficients do not change within a history.
+The policy is memoryless and does not optimize or plan. Its stock inputs reflect
+past events, but it cannot distinguish histories ending in the same state.
+
+Other implemented policies include FixedPolicy and SafetyGapPolicy (normal versus
+cautious allocation based on a gap threshold). The latter can use cautious=0 but
+does not include the graduated policy's deficit term. Verify exact APIs in source.
+
+Useful identities:
+- Total expected payoff = 10 - 110*p_catastrophe.
+- Under symmetry, expected payoff per player = 5 - 55*p_catastrophe.
+  Zero payoff occurs at p=1/11, NOT at a universal safety_rate value.
+- If A leads and B allocates zero to capability, signed gap D=C_A-S changes by
+  g*a_A*M_A - h*(2-a_A). Expected signed gap shrinks when a_A < 2h/(g+h)=0.75.
+  This is not a guarantee of positive-gap closure under noise.
+- B chooses zero when k_G*G >= 0.6 + 0.1*(C_A-C_B).
+  k_G is a coefficient, not an allocation; it may exceed 1.
+
+## Infrastructure and statistical conventions
+
+- Single-run overrides: `--set path=value`.
+- Sweeps: repeatable `--sweep "path=v1,v2,..."`; multiple paths form a Cartesian
+  product. Also CSV input, dry-run, quiet mode. Inspect runner help for details.
+- Quote comma-separated arguments in PowerShell, especially through Run-Game.
+- Full history tracing: `--save-trajectories`, producing `trajectories.csv.gz`.
+- Each experiment saves resolved config/metadata, episodes.csv, summary.csv,
+  and a separate illustrative trajectory.csv. The illustrative trajectory is NOT
+  included in Monte Carlo summary statistics; its seed is separately recorded.
+- Recent instrumentation saves mean allocations, counts of zero/one allocations,
+  maximum post-update gap, and cumulative hazard exposure per history. Exposure
+  is sum(lambda*post_gap), not a probability. Earlier runs lack these diagnostics.
+- Trace instrumentation was requested to preserve outcomes and RNG consumption;
+  consult implementation/test results before modifying it.
+- SeedSequence(seed).spawn(trials) supplies per-history RNGs. Pair comparisons by
+  (seed, trial ID), never trial ID alone when combining seed batches.
+- Means use Student-t approximate intervals; catastrophe summaries use Wilson.
+  Paired analyses use per-history differences and their sample SE. Individual
+  intervals are not adjusted for multiple comparisons or sequential selection.
+- Same seed and trial count repeats evidence, not an independent sample. We used
+  seeds 2026-2030, 1000 trials each, yielding 5000 histories per setting.
+- Commit tested source before research runs. Metadata marks dirty source; a clean
+  commit identifies repository code, not necessarily the entire execution environment.
+
+PowerShell convenience function (lost when the terminal session closes):
+
+```powershell
+function Run-Game {
+    & .\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json @args
+}
+```
+
+## Findings and experiment trail
+
+Earlier phases: fixed-allocation grid, then threshold and graduated adaptive
+policies. Removing both players' safety response greatly increased catastrophe
+risk. Removing deficit response had little effect with safety response present,
+but worsened average payoff when safety response was absent. Safety productivity
+sweeps h=0.3,0.45,0.6,0.75,0.9 reduced risk strongly with other settings fixed.
+See external outputs/steps-1-2 and paired_differences.csv for those analyses.
+
+We next searched one player's safety coefficient while holding the other fixed.
+All results below keep a0=0.6 and k_D=0.1 for both players and default environment.
+
+### A sweep against B safety_response=0.20
+
+| A k_G | A pooled payoff | B pooled payoff | Catastrophe |
+|---:|---:|---:|---:|
+| 0 | 0.676 | -6.516 | 14.40% |
+| 0.05 | 1.500 | -4.172 | 11.52% |
+| 0.10 | 1.188 | -2.342 | 10.14% |
+| 0.15 | 1.044 | -0.570 | 8.66% |
+
+A=0.05 was best sampled in each of five batches. Pooled paired advantage over
+A=0,0.10,0.15 was respectively +0.824,+0.312,+0.456; each individual 95% CI excluded
+zero. This did not locate the continuous optimum.
+
+Sources: individual experiment directories `experiment-20260910T205333836580Z`
+(A=0) and `experiment-20260910T205411396062Z` (A=0.1), plus sweeps
+`sweep-20260910T213758806794Z`, `sweep-20260910T215611553259Z`, and
+`sweep-20260910T220034015004Z`. Filter resolved configs/seeds; not every child is
+part of this comparison. External analysis: outputs/five-seed-comparison/sources.csv.
+
+### B sweep against A safety_response=0.05
+
+| B k_G | A payoff | B payoff | Catastrophe |
+|---:|---:|---:|---:|
+| 0 | -15.172 | -9.830 | 31.82% |
+| 0.05 | -7.872 | -7.780 | 23.32% |
+| 0.10 | -3.044 | -6.294 | 17.58% |
+| 0.15 | -0.284 | -5.116 | 14.00% |
+| 0.20 | 1.500 | -4.172 | 11.52% |
+| 0.25 | 2.536 | -3.514 | 9.98% |
+| 0.30 | 3.426 | -2.908 | 8.62% |
+| 0.40 | 4.470 | -2.148 | 6.98% |
+| 0.50 | 5.136 | -1.714 | 5.98% |
+| 0.70 | 6.200 | -0.908 | 4.28% |
+| 1 | 7.008 | -0.264 | 2.96% |
+| 1.5 | 7.546 | 0.166 | 2.08% |
+| 2 | 7.738 | 0.348 | 1.74% |
+| 3 | 7.954 | 0.550 | 1.36% |
+| 4 | 8.110 | 0.658 | 1.12% |
+| 5 | 8.068 | 0.722 | 1.10% |
+| 10 | 8.212 | 0.886 | 0.82% |
+
+B benefits from stronger safety even though A captures most payoff. B=10 is
+best sampled, not a demonstrated optimum. Paired B gains: 3->4 +0.108
+CI[-0.008,0.224]; 4->5 +0.064 CI[-0.059,0.187]; 5->10 +0.164
+CI[0.030,0.298]; 3->10 +0.336 CI[0.184,0.488].
+
+Diagnostics: from B=3 to 10, mean B capability allocation changes only
+0.5312->0.5296, while zero-capability periods rise 7.23%->15.32% of executed
+periods. Mean per-history maximum gap falls 0.363->0.322. This suggests timing
+matters, but does NOT isolate the causal contribution of all-safety bursts.
+
+Sweep directories (under results):
+- `sweep-20260910T220808781259Z`: B=0,0.05,0.10,0.15.
+- `sweep-20260910T221425929076Z`: B=0.25,0.30,0.40.
+- `sweep-20260910T221959372654Z`: B=0.50,0.70,1.
+- `sweep-20260911T023414945806Z`: B=1.5,2,3; new diagnostics/full traces.
+- `sweep-20260911T030850898132Z`: B=4,5,10.
+- B=0.20 reused from the previous A sweep.
+
+External outputs: b-response-five-seeds, b-response-extended,
+b-response-through-1, b-response-above-1, b-response-through-10.
+
+### A response against B safety_response=10 (latest completed experiment)
+
+| A k_G | A payoff | B payoff | Catastrophe |
+|---:|---:|---:|---:|
+| 0 | 8.152 | 0.792 | 0.96% |
+| 0.025 | 8.170 | 0.774 | 0.96% |
+| 0.05 | 8.212 | 0.886 | 0.82% |
+| 0.10 | 8.068 | 0.744 | 1.08% |
+| 0.20 | 7.902 | 0.844 | 1.14% |
+
+Paired A changes versus 0.05:
+- 0: -0.060, CI[-0.196,0.076].
+- 0.025: -0.042, CI[-0.160,0.076].
+- 0.10: -0.144, CI[-0.282,-0.006] (weak given multiple comparisons).
+- 0.20: -0.310, CI[-0.471,-0.149].
+
+Source: `sweep-20260911T031630014001Z`; reuse A=0.05,B=10 from prior sweep.
+External analysis: outputs/a-response-to-b10.
+No demonstrated equilibrium: search covers selected coefficients only, B optimum
+not bracketed, other policy families untested. Symmetry permits swapping roles;
+the search selected an asymmetric configuration, not spontaneous role emergence.
+
+## Next experiment: proposed, NOT implemented or run yet
+
+User is particularly interested in a player periodically sacrificing capability
+investment to protect shared safety. Test a threshold intervention policy against
+the graduated controls, rather than endlessly refining k_G.
+
+Proposed B rule:
+
+    if pre_gap > threshold:
+        allocation_b = 0
+    else:
+        allocation_b = clip(0.6 + 0.1*(C_A-C_B), 0, 1)
+
+Retain the deficit term to avoid changing two mechanisms at once. This differs
+from existing SafetyGapPolicy and likely needs a small pluggable policy addition.
+Proposed thresholds: 0.05,0.10,0.20,0.40. A remains graduated k_G=0.05.
+Controls: existing graduated B k_G=5 and 10. Use seeds 2026-2030, 1000 histories
+each, full traces. User has discussed this proposal but has not yet requested its
+implementation or authorized these research runs. Discuss/confirm scope next.
+
+Compare B payoff, catastrophe frequency, mean safety effort, zero-allocation
+frequency, intervention lengths, and gap recovery. If total effort differs, a
+follow-up approximately effort-matched comparison is needed before attributing
+advantages specifically to timing. Do not call bursts proven superior already.
+
+## Policy ideas backlog and longer-term roadmap
+
+1. Threshold intervention: memoryless all-safety mode above a gap threshold.
+2. Hysteresis: enter above a high threshold; exit below a lower one. Requires
+   per-player policy state and explicit reset between histories.
+3. Trend-aware: respond to gap growth, requiring observation history.
+4. Short-horizon planning: simulate candidate actions internally each period.
+   Requires separate planning RNG, restricted information, and explicit opponent
+   assumptions; modest versions can be laptop-feasible.
+5. Policy search/learning: distinguish offline coefficient optimization from
+   online action selection. Use unseen seeds and alternative model assumptions
+   for evaluation. Do not assume an optimizer's simulator success is realism.
+6. Challenge instant shared safety: delays, depreciation, limited productivity,
+   or imperfect sharing may weaken reactive bursts. These are proposals, not
+   currently implemented mechanisms.
+7. Challenge terminal winner-take-all payoff: second-place value and/or absolute
+   capability returns. Preserve original model as a selectable baseline.
+8. Initial leader/challenger asymmetry and noisy/delayed observations.
+9. Regulation/agreement/enforcement dial with zero reproducing the unregulated
+   baseline. Evaluate unilateral deviation gains as well as catastrophe rates.
+10. More agents, GPU/cloud only when the scientific question warrants the cost.
+
+## Maintenance and resumption checklist
+
+- Read this file, model register, current source/config, and relevant run metadata.
+- Verify actual working directory and read/write permissions; UI panel position
+  is not evidence of repo access.
+- Preserve source provenance and raw results. Analysis artifacts outside the repo
+  may need copying/recreation; do not assume they are committed.
+- Update this file after decisions and completed experiments; label proposals,
+  implementations, and completed runs distinctly.
+- Link this file from root README. Keep model definitions in MODEL_REGISTER and
+  exact experimental details in metadata; this file is the navigation/handoff.
