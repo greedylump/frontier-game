@@ -39,7 +39,8 @@ Try `--a 0.4 --b 0.4`, then `--a 0.8 --b 0.8`. See `--help` for all flags.
 - `experiments/laptop/`: repeatable experiment entry point.
 - `docs/`: [assumptions](docs/model.md), [learning path](docs/learning-path.md),
   [game theory](docs/game-theory.md), [Monte Carlo](docs/monte-carlo.md),
-  [compute regimes](docs/compute.md), [portfolio workflow](docs/workflow.md).
+  [compute regimes](docs/compute.md), [portfolio workflow](docs/workflow.md),
+  [project state](docs/PROJECT_STATE.md).
 
 Use modules for machinery and notebooks for questions. No GPU, cloud, or RL setup
 is needed. Dependencies have lower bounds for installation flexibility; save an

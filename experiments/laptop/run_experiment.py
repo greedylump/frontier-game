@@ -1,4 +1,4 @@
-"""Run independently configured fixed, safety-gap, or graduated policies from strict JSON."""
+"""Run independently configured fixed, safety-gap, graduated, or threshold-intervention policies from strict JSON."""
 import argparse
 import csv
 import gzip
@@ -20,7 +20,8 @@ from time import perf_counter, sleep
 import numpy as np
 import pandas as pd
 from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION
-from frontier_game import Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy, run_trials, simulate, summarize
+from frontier_game import (Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy,
+                            ThresholdInterventionPolicy, run_trials, simulate, summarize)
 
 # Support both direct script execution and package imports in tests.
 if __package__:
@@ -28,11 +29,14 @@ if __package__:
 else:
     from safety_gap import code_provenance, save_metadata, utc_now
 
-POLICY_TYPES = {'fixed': FixedPolicy, 'safety_gap': SafetyGapPolicy, 'graduated': GraduatedPolicy}
+POLICY_TYPES = {'fixed': FixedPolicy,
+                'safety_gap': SafetyGapPolicy,
+                'graduated': GraduatedPolicy,
+                'threshold_intervention': ThresholdInterventionPolicy}
 
 
 def model_id_for(policy_a, policy_b):
-    if any(isinstance(policy, GraduatedPolicy) for policy in (policy_a, policy_b)):
+    if any(isinstance(policy, (GraduatedPolicy, ThresholdInterventionPolicy)) for policy in (policy_a, policy_b)):
         return 'FG-M003'
     if any(isinstance(policy, SafetyGapPolicy) for policy in (policy_a, policy_b)):
         return 'FG-M002'

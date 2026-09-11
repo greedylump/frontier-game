@@ -22,8 +22,8 @@ identification of affected runs, even if the intended scientific model is unchan
 | Model ID | Name | Status | Parent | Defining change |
 |---|---|---|---|---|
 | FG-M001 | Fixed-allocation, shared-safety baseline | Implemented; existing runs retrospectively classified | None | Two symmetric players, constant allocations, terminal rank prize |
-| FG-M002 | Per-period policies with exact observations | Implemented; small verification only | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
-| FG-M003 | Graduated relative-position and safety response | Implemented; small verification only | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
+| FG-M002 | Per-period policies with exact observations | Implemented; research runs exist; not limited to small verification | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
+| FG-M003 | Graduated relative-position and safety response | Implemented; research runs exist; not limited to small verification | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
 
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,

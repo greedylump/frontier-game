@@ -8,7 +8,8 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
-from frontier_game import Config, FixedPolicy, Observation, SafetyGapPolicy, run_trials, simulate
+from frontier_game import (Config, FixedPolicy, Observation, SafetyGapPolicy,
+                            ThresholdInterventionPolicy, run_trials, simulate)
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('safety_gap_entry', ROOT / 'experiments/laptop/safety_gap.py')
@@ -102,6 +103,17 @@ def test_identical_gap_rules_equal_actions_and_no_episode_state():
     assert result['capability_a'] != result['capability_b']
     assert a.choose_allocation(Observation(2, 30, 3, 1, 2)) == b.choose_allocation(Observation(2, 30, 1, 3, 2))
     assert simulate(config, a, b, np.random.default_rng(5), trace=True) == result
+
+
+def test_threshold_intervention_policy_thresholds_and_normal_branch():
+    policy = ThresholdInterventionPolicy(base_allocation=.6, deficit_response=.1,
+                                         threshold=.05)
+    high_gap = Observation(1, 30, own_capability=4.0, opponent_capability=3.0,
+                            shared_safety=1.0)
+    low_gap = Observation(1, 30, own_capability=1.0, opponent_capability=0.0,
+                           shared_safety=2.0)
+    assert policy.choose_allocation(high_gap) == 0.0
+    assert policy.choose_allocation(low_gap) == pytest.approx(.5)
 
 
 def test_identical_relative_rules_can_choose_different_actions():

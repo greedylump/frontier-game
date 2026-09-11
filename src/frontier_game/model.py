@@ -130,6 +130,37 @@ class GraduatedPolicy:
         return float(np.clip(allocation, 0.0, 1.0))
 
 
+@dataclass(frozen=True)
+class ThresholdInterventionPolicy:
+    """Memoryless intervention rule: protect shared safety by forcing zero when gap exceeds threshold.
+
+    Otherwise it falls back to a graduated-like normal branch where the same
+    deficit term is retained, but the safety-gap response is intentionally not
+    applied. The proposal is designed for a minimal pluggable experiment.
+    """
+    base_allocation: float = 0.60
+    deficit_response: float = 0.10
+    threshold: float = 0.05
+
+    def __post_init__(self):
+        validate_allocation(self.base_allocation)
+        if (isinstance(self.deficit_response, (bool, np.bool_)) or not isinstance(self.deficit_response, Real)
+                or not math.isfinite(self.deficit_response) or self.deficit_response < 0):
+            raise ValueError('deficit_response must be finite and nonnegative')
+        if (isinstance(self.threshold, (bool, np.bool_)) or not isinstance(self.threshold, Real)
+                or not math.isfinite(self.threshold) or self.threshold < 0):
+            raise ValueError('threshold must be finite and nonnegative')
+
+    def choose_allocation(self, observation: Observation) -> float:
+        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
+                  - observation.shared_safety)
+        if gap > self.threshold:
+            return 0.0
+        deficit = observation.opponent_capability - observation.own_capability
+        allocation = self.base_allocation + self.deficit_response * deficit
+        return float(np.clip(allocation, 0.0, 1.0))
+
+
 def simulate(config: Config, policy_a: Policy, policy_b: Policy,
              rng: np.random.Generator, *, trace: bool = False) -> dict:
     """Run one episode. Randomness belongs to the caller, never global state.

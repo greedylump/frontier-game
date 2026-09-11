@@ -5,6 +5,17 @@ Prepared from the research conversation and saved results through run
 Read this first when resuming, then consult `MODEL_REGISTER.md`, source, and run
 metadata. Update this file after meaningful decisions or completed experiment batches.
 
+## Current plan and decision discipline
+
+- Planned next experiment is recorded here for discussion and review only.
+- No implementation or execution of that proposed next experiment is authorized yet.
+- This file is the repository-forward source of truth for pending research decisions,
+  and it should be updated after meaningful decisions or completed experiment batches.
+- The model register is being brought into alignment with the evidence in the
+  repository runs: FG-M002 and FG-M003 are no longer described as "small
+  verification only" when the run history now includes research sweeps and broader
+  experiment batches.
+
 ## Goal and working style
 
 Research question: under what modeled conditions and amount of outside pressure
