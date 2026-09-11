@@ -1,0 +1,34 @@
+{
+  "name": "threshold-intervention-b-vs-graduated-a",
+  "description": "A graduated player uses the existing safety-response coefficient k_G=0.05 while B uses the threshold intervention rule that sets allocation to zero above a shared-gap threshold and otherwise falls back to the normal graduated branch with the same deficit term.",
+  "category": "research",
+  "model": {
+    "horizon": 30,
+    "capability_rate": 1.0,
+    "safety_rate": 0.6,
+    "noise": 0.25,
+    "hazard_scale": 0.01,
+    "first_mover_value": 10.0,
+    "catastrophe_cost": 50.0
+  },
+  "trials": 1000,
+  "seed": 2026,
+  "policies": {
+    "a": {
+      "type": "graduated",
+      "parameters": {
+        "base_allocation": 0.6,
+        "deficit_response": 0.1,
+        "safety_response": 0.05
+      }
+    },
+    "b": {
+      "type": "threshold_intervention",
+      "parameters": {
+        "base_allocation": 0.6,
+        "deficit_response": 0.1,
+        "threshold": 0.05
+      }
+    }
+  }
+}
