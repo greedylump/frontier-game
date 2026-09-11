@@ -1,4 +1,5 @@
 """Independent episodes, Monte Carlo errors, and bounded event intervals."""
+from typing import Callable
 import numpy as np
 import pandas as pd
 from scipy.stats import t, norm
@@ -6,16 +7,28 @@ from .model import Config, Policy, simulate
 
 
 def run_trials(config: Config, policy_a: Policy, policy_b: Policy,
-               trials: int = 1000, seed: int = 42) -> pd.DataFrame:
+               trials: int = 1000, seed: int = 42, *,
+               trace_sink: Callable[[int, list[dict]], None] | None = None) -> pd.DataFrame:
+    """Optionally deliver one completed episode trace at a time to trace_sink.
+
+    The sink receives (zero-based trial ID, history). Trace buffering is bounded
+    by one episode (at most config.horizon rows), not the trial count.
+    """
     if type(trials) is not int or trials < 2:
         raise ValueError("trials must be an integer >= 2 for uncertainty estimates")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
     children = np.random.SeedSequence(seed).spawn(trials)
-    return pd.DataFrame([
-        dict(trial=i, **simulate(config, policy_a, policy_b, np.random.default_rng(child)))
-        for i, child in enumerate(children)
-    ])
+    outcomes = []
+    for i, child in enumerate(children):
+        outcome = simulate(config, policy_a, policy_b, np.random.default_rng(child),
+                           trace=trace_sink is not None)
+        if trace_sink is not None:
+            history = outcome.pop('history')
+            trace_sink(i, history)
+            del history
+        outcomes.append(dict(trial=i, **outcome))
+    return pd.DataFrame(outcomes)
 
 
 def summarize(frame: pd.DataFrame) -> pd.DataFrame:

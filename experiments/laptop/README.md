@@ -247,3 +247,69 @@ naturally reflect the actual run. Dry-run output remains visible even with `--qu
 
 This is experiment infrastructure and does not increment the mathematical model ID.
 Only tiny verification experiments were executed during implementation.
+
+## Behavioral diagnostics and full Monte Carlo trajectories
+
+New `episodes.csv` files preserve all earlier columns and add diagnostics by
+default, even without tracing:
+
+- `mean_allocation_a`, `mean_allocation_b`: arithmetic mean capability allocation.
+- `allocation_zero_periods_a/b`, `allocation_one_periods_a/b`: counts of exact
+  endpoint choices (0 or 1, not an approximate tolerance).
+- `max_post_gap`: maximum post-update shared safety gap.
+- `cumulative_hazard_exposure`: sum of `hazard_scale * post_gap`.
+
+All diagnostics use executed periods only, including the terminal catastrophe
+period. Means divide by executed steps, not the configured horizon. Cumulative
+hazard exposure is neither a catastrophe count nor a probability; it can exceed 1.
+The existing uncertainty summary retains its payoff, catastrophe, and duration
+metrics, and can still summarize older episode CSVs without these extra columns.
+
+The default remains no full-history file. Add `--save-trajectories` when intermediate
+states are needed, including for our current research sweeps. A small manual check:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set trials=2 --set model.horizon=3 --save-trajectories
+```
+
+The next research sweep can be run manually with:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --sweep policies.a.parameters.safety_response=0.05,0.15,0.25 --save-trajectories
+```
+
+Each experiment directory then contains `trajectories.csv.gz`, with every executed
+period of every Monte Carlo trial. It adds `experiment_seed` and zero-based `trial`
+to the existing trace fields: 1-based `step`, `horizon`, `pre_*` observations/state,
+`allocation_a/b`, and `post_*` state, gap, hazard probability (`post_hazard`), and
+catastrophe. Legacy unprefixed post-state aliases are retained. A observes its own
+`pre_capability_a`; B observes its own `pre_capability_b`. Both see the same shared
+safety and pre-transition state. Trials stop at catastrophe; there are no padded rows.
+
+```python
+import pandas as pd
+trace = pd.read_csv("results/YOUR-SWEEP/0001/trajectories.csv.gz")
+# For large files, use bounded chunks:
+for chunk in pd.read_csv("results/YOUR-SWEEP/0001/trajectories.csv.gz", chunksize=100_000):
+    pass  # Analyze or aggregate each chunk.
+```
+
+The existing `trajectory.csv` is still one separately seeded illustration; it is
+NOT one of the histories in the Monte Carlo summary. `trajectories.csv.gz` contains
+those actual histories with the unchanged experiment-seed/trial mapping for pairing.
+Only one episode's trace is buffered at a time, then written before the next trial.
+`--quiet` changes terminal output only, and `--dry-run` writes no trajectories.
+
+Runner metadata keeps metadata schema 1 and records additive output schema 2,
+diagnostic definitions, whether full tracing is enabled, filename, file status,
+completed traced trials, and row counts. Exceptions close gzip output and mark an
+unfinished trace incomplete; successfully written earlier histories are retained.
+Such partial files must not be treated as completed datasets. Abrupt process or
+machine termination may leave stale status or truncated output, unlike a handled
+exception. Overwrite protection remains in force.
+
+Older histories remain usable for their saved outcomes. Missing intermediate
+states cannot be recovered from aggregate outcomes: regenerate with the matching
+source, configuration, policies, and seeds in a fresh directory if those traces
+are needed. No historical results were regenerated for this implementation.
+This is instrumentation, not a new mathematical model; model IDs are unchanged.

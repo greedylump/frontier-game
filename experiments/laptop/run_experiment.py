@@ -1,6 +1,8 @@
 """Run independently configured fixed, safety-gap, or graduated policies from strict JSON."""
 import argparse
 import csv
+import gzip
+from contextlib import nullcontext
 import io
 from itertools import product
 from copy import deepcopy
@@ -17,6 +19,7 @@ from time import perf_counter, sleep
 
 import numpy as np
 import pandas as pd
+from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION
 from frontier_game import Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy, run_trials, simulate, summarize
 
 # Support both direct script execution and package imports in tests.
@@ -145,12 +148,19 @@ def apply_overrides(document, specifications):
 
 
 def execute_experiment(source, document, input_path, overrides, prepared, output,
-                       run_command, provenance, quiet=False):
+                       run_command, provenance, quiet=False, save_trajectories=False):
     """The same execution and output format for single runs and sweep members."""
     config, policy_a, policy_b, resolved = prepared
     seed, trials = resolved['seed'], resolved['trials']
     metadata = dict(model_id=model_id_for(policy_a, policy_b),
-                    metadata_schema_version=1, run_id=output.name,
+                    metadata_schema_version=1, output_schema_version=OUTPUT_SCHEMA_VERSION, run_id=output.name,
+                    diagnostics=dict(definitions=DIAGNOSTIC_DEFINITIONS,
+                        periods='Executed periods only, including terminal catastrophe.'),
+                    full_trajectories=dict(enabled=save_trajectories,
+                        filename='trajectories.csv.gz' if save_trajectories else None,
+                        status='pending' if save_trajectories else 'disabled',
+                        completed_trials=0, rows=0, buffering='one completed episode',
+                        seed_column='experiment_seed', trial_column='trial', period_column='step'),
                     experiment_name=resolved['name'], description=resolved['description'], category=resolved['category'],
                     input_config=document, overrides=overrides, input_config_path=str(input_path.resolve()), resolved_config=resolved,
                     config=asdict(config), initial_state=dict(capability_a=0.0, capability_b=0.0, shared_safety=0.0),
@@ -174,7 +184,32 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
     save_metadata(output, metadata)
     try:
         (output / 'input_config.json').write_bytes(source)
-        episodes = run_trials(config, policy_a, policy_b, trials=trials, seed=seed)
+        trace_info = metadata['full_trajectories']
+        stream_context = (gzip.open(output / 'trajectories.csv.gz', 'wt', encoding='utf-8', newline='')
+                          if save_trajectories else nullcontext(None))
+        with stream_context as stream:
+            writer = None
+
+            def save_history(trial, history):
+                nonlocal writer
+                if writer is None:
+                    writer = csv.DictWriter(stream, fieldnames=['experiment_seed', 'trial', *history[0]])
+                    writer.writeheader()
+                for row in history:
+                    writer.writerow(dict(experiment_seed=seed, trial=trial, **row))
+                stream.flush()
+                trace_info['rows'] += len(history)
+                trace_info['completed_trials'] += 1
+
+            if save_trajectories:
+                trace_info['status'] = 'writing'
+                episodes = run_trials(config, policy_a, policy_b, trials=trials, seed=seed,
+                                      trace_sink=save_history)
+            else:
+                episodes = run_trials(config, policy_a, policy_b, trials=trials, seed=seed)
+        if save_trajectories:
+            trace_info['status'] = 'complete'
+
         episodes.to_csv(output / 'episodes.csv', index=False)
         metadata['completed_trials'] = len(episodes)
         summary = summarize(episodes)
@@ -188,6 +223,8 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
             print(f'Saved to {output.resolve()}')
         return summary
     except BaseException as error:
+        if save_trajectories and metadata['full_trajectories']['status'] != 'complete':
+            metadata['full_trajectories']['status'] = 'incomplete'
         metadata['status'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'failed'
         metadata['error'] = f'{type(error).__name__}: {error}'
         raise
@@ -271,7 +308,8 @@ def save_manifest(output, manifest):
 
 def execute_sweep(source, document, args, plans, csv_source, command, provenance):
     output = args.output or Path('results') / datetime.now(timezone.utc).strftime('sweep-%Y%m%dT%H%M%S%fZ')
-    manifest = dict(input_config=document, input_config_path=str(args.config.resolve()),
+    manifest = dict(output_schema_version=OUTPUT_SCHEMA_VERSION, save_trajectories=args.save_trajectories,
+                    input_config=document, input_config_path=str(args.config.resolve()),
                     sweep_specification=dict(set=args.overrides, sweep=args.sweep,
                         sweep_csv=str(args.sweep_csv.resolve()) if args.sweep_csv else None,
                         csv_text=csv_source.decode('utf-8-sig') if csv_source is not None else None),
@@ -300,7 +338,7 @@ def execute_sweep(source, document, args, plans, csv_source, command, provenance
                 values = ', '.join(f'{path}={json.dumps(value)}' for path, value in plan['varied_parameters'].items())
                 print(f'Experiment {entry["experiment_id"]}/{len(plans)}: {values}', flush=True)
             summary = execute_experiment(source, document, args.config, plan['overrides'], plan['prepared'],
-                                         output / entry['output_path'], command, provenance, args.quiet)
+                                         output / entry['output_path'], command, provenance, args.quiet, args.save_trajectories)
             combined = summary.copy()
             combined.insert(0, 'experiment_id', entry['experiment_id'])
             for path, value in plan['varied_parameters'].items():
@@ -336,6 +374,8 @@ def main(argv=None):
     modes.add_argument('--sweep-csv', type=Path)
     parser.add_argument('--dry-run', action='store_true', help='Show resolved settings without simulation or output files')
     parser.add_argument('--quiet', action='store_true', help='Suppress tables and routine progress; retain errors and completion')
+    parser.add_argument('--save-trajectories', action='store_true',
+                        help='Stream every Monte Carlo history to trajectories.csv.gz')
     args = parser.parse_args(argv)
     try:
         source = args.config.read_bytes()
@@ -361,7 +401,7 @@ def main(argv=None):
             output = args.output or Path('results') / datetime.now(timezone.utc).strftime('experiment-%Y%m%dT%H%M%S%fZ')
             plan = plans[0]
             execute_experiment(source, document, args.config, plan['overrides'], plan['prepared'], output,
-                               command, provenance, args.quiet)
+                               command, provenance, args.quiet, args.save_trajectories)
             if args.quiet:
                 print(f'Completed 1/1 experiments; output: {output.resolve()}')
     except BaseException as error:

@@ -6,6 +6,20 @@ from typing import Protocol
 import numpy as np
 
 
+# Instrumentation schema only; mathematical model IDs are unchanged.
+OUTPUT_SCHEMA_VERSION = 2
+DIAGNOSTIC_DEFINITIONS = {
+    'mean_allocation_a': 'Sum of A allocations divided by executed periods.',
+    'mean_allocation_b': 'Sum of B allocations divided by executed periods.',
+    'allocation_zero_periods_a': 'Executed periods with A allocation exactly 0.',
+    'allocation_zero_periods_b': 'Executed periods with B allocation exactly 0.',
+    'allocation_one_periods_a': 'Executed periods with A allocation exactly 1.',
+    'allocation_one_periods_b': 'Executed periods with B allocation exactly 1.',
+    'max_post_gap': 'Maximum post-update shared safety gap over executed periods.',
+    'cumulative_hazard_exposure': 'Sum of hazard_scale * post_gap over executed periods; neither a catastrophe count nor a probability.',
+}
+
+
 @dataclass(frozen=True)
 class Config:
     horizon: int = 30
@@ -127,6 +141,11 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
     capability = np.zeros(2)
     safety = 0.0
     history = []
+    allocation_sum = np.zeros(2)
+    allocation_zero_periods = np.zeros(2, dtype=int)
+    allocation_one_periods = np.zeros(2, dtype=int)
+    max_post_gap = 0.0
+    cumulative_hazard_exposure = 0.0
     catastrophe = False
     for step in range(1, config.horizon + 1):
         observations = make_observations(step, config.horizon, float(capability[0]),
@@ -143,6 +162,12 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
         gap = max(0.0, float(capability.max()) - safety)
         hazard = float(-np.expm1(-config.hazard_scale * gap))
         catastrophe = bool(rng.random() < hazard)
+        # Observe the executed transition, including a terminal catastrophe period.
+        allocation_sum += allocation
+        allocation_zero_periods += allocation == 0
+        allocation_one_periods += allocation == 1
+        max_post_gap = max(max_post_gap, gap)
+        cumulative_hazard_exposure += config.hazard_scale * gap
         if trace:
             history.append(dict(step=step, horizon=config.horizon,
                                 pre_capability_a=observations[0].own_capability,
@@ -169,6 +194,14 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
     result = dict(steps=step, catastrophe=catastrophe,
                   capability_a=float(capability[0]), capability_b=float(capability[1]),
                   safety=safety, payoff_a=float(payoff[0]), payoff_b=float(payoff[1]))
+    result.update(mean_allocation_a=float(allocation_sum[0] / step),
+                  mean_allocation_b=float(allocation_sum[1] / step),
+                  allocation_zero_periods_a=int(allocation_zero_periods[0]),
+                  allocation_zero_periods_b=int(allocation_zero_periods[1]),
+                  allocation_one_periods_a=int(allocation_one_periods[0]),
+                  allocation_one_periods_b=int(allocation_one_periods[1]),
+                  max_post_gap=max_post_gap,
+                  cumulative_hazard_exposure=cumulative_hazard_exposure)
     if trace:
         result["history"] = history
     return result

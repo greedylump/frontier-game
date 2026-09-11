@@ -220,3 +220,21 @@ metadata schema remains 1. Implementation revision: current uncommitted changes;
 no new commit or historical provenance is claimed. Associated example:
 `experiments/laptop/configs/graduated.json`, run through `run_experiment.py`.
 Only small verification tests were run at introduction, not a research experiment.
+
+## Instrumentation: output schema 2
+
+Behavioral diagnostics and optional full Monte Carlo tracing are instrumentation,
+not changes to transitions, policies, payoffs, observation timing, or RNG consumption.
+FG-M001/FG-M002/FG-M003 assignments remain as above. New episode outputs add mean
+allocations, exact endpoint counts, maximum post-update gap, and cumulative hazard
+exposure, over executed periods including a fatal period. Exposure sums
+`hazard_scale * post_gap`; it is not a count or a probability.
+
+The JSON runner records output schema 2 separately from metadata schema 1, with
+diagnostic definitions and enabled/disabled full-trace status and filename.
+`--save-trajectories` writes the actual Monte Carlo histories incrementally to
+`trajectories.csv.gz`; the separately seeded `trajectory.csv` remains illustrative
+and excluded from the summary. Historical output schema/metadata is not rewritten.
+Older tables without diagnostics remain valid for their existing analyses; recovering
+missing states requires matching-source/config/seed regeneration into a new run.
+Only tiny verification experiments were executed when adding this instrumentation.

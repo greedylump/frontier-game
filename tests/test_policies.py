@@ -1,4 +1,4 @@
-﻿"""Small policy/interface checks; no research runs or allocation sweeps."""
+"""Small policy/interface checks; no research runs or allocation sweeps."""
 from dataclasses import FrozenInstanceError
 import importlib.util
 import json
@@ -32,13 +32,14 @@ def test_fixed_policy_exact_prechange_reference():
         rng = np.random.default_rng(case['seed'])
         actual = simulate(Config(**case['config']), FixedPolicy(case['a']), FixedPolicy(case['b']), rng, trace=True)
         expected = case['result']
-        assert {k: v for k, v in actual.items() if k != 'history'} == {k: v for k, v in expected.items() if k != 'history'}
+        # Compare every historical column exactly; new diagnostics are additive.
+        assert {k: actual[k] for k in expected if k != 'history'} == {k: v for k, v in expected.items() if k != 'history'}
         assert len(actual['history']) == len(expected['history'])
         for new, old in zip(actual['history'], expected['history']):
             assert {k: new[k] for k in old} == old
         assert rng.random() == case['next_random']
     actual = run_trials(Config(), FixedPolicy(.8), FixedPolicy(.4), trials=4, seed=71)
-    assert actual.to_dict('records') == reference['trials']
+    assert actual[list(reference['trials'][0])].to_dict('records') == reference['trials']
 
 
 def test_observations_are_immutable_oriented_pretransition_views():
