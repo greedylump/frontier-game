@@ -1,3 +1,5 @@
+# Frozen from f9774c1796c37a714379270828a8f604da567609:src/frontier_game/model.py
+# Test-only compatibility oracle; do not use in production.
 """A finite-horizon game with simultaneous per-period allocations and shared safety."""
 from dataclasses import dataclass, asdict
 import math
@@ -6,8 +8,8 @@ from typing import Protocol
 import numpy as np
 
 
-# Output schema is separate from scientific model classification.
-OUTPUT_SCHEMA_VERSION = 3
+# Instrumentation schema only; mathematical model IDs are unchanged.
+OUTPUT_SCHEMA_VERSION = 2
 DIAGNOSTIC_DEFINITIONS = {
     'mean_allocation_a': 'Sum of A allocations divided by executed periods.',
     'mean_allocation_b': 'Sum of B allocations divided by executed periods.',
@@ -17,10 +19,6 @@ DIAGNOSTIC_DEFINITIONS = {
     'allocation_one_periods_b': 'Executed periods with B allocation exactly 1.',
     'max_post_gap': 'Maximum post-update shared safety gap over executed periods.',
     'cumulative_hazard_exposure': 'Sum of hazard_scale * post_gap over executed periods; neither a catastrophe count nor a probability.',
-    'pending_capability_a': 'Realized unfinished capability produced by lab A, after current investment and arrivals, before catastrophe; episode value is from the last executed period. No current risk, protection, or terminal prize credit.',
-    'pending_capability_b': 'Realized unfinished capability produced by lab B, after current investment and arrivals, before catastrophe; episode value is from the last executed period. No current risk, protection, or terminal prize credit.',
-    'pending_safety_a': 'Realized unfinished safety produced by lab A, after current investment and arrivals, before catastrophe; episode value is from the last executed period. No current risk, protection, or terminal prize credit.',
-    'pending_safety_b': 'Realized unfinished safety produced by lab B, after current investment and arrivals, before catastrophe; episode value is from the last executed period. No current risk, protection, or terminal prize credit.',
 }
 
 
@@ -33,21 +31,11 @@ class Config:
     hazard_scale: float = 0.01
     first_mover_value: float = 10.0
     catastrophe_cost: float = 50.0
-    capability_delay_a: int = 0
-    safety_delay_a: int = 0
-    capability_delay_b: int = 0
-    safety_delay_b: int = 0
 
     def __post_init__(self):
         if type(self.horizon) is not int or self.horizon < 1:
             raise ValueError("horizon must be a positive integer")
-        for name in ('capability_delay_a','safety_delay_a','capability_delay_b','safety_delay_b'):
-            value = getattr(self, name)
-            if type(value) is not int or value < 0:
-                raise ValueError(f'{name} must be a nonnegative integer')
         for name, value in asdict(self).items():
-            if name in ('capability_delay_a','safety_delay_a','capability_delay_b','safety_delay_b'):
-                continue
             if name != "horizon" and (not math.isfinite(value) or value < 0):
                 raise ValueError(f"{name} must be finite and nonnegative")
 
@@ -182,9 +170,6 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
     A trace records pre-transition decisions and post-transition outcomes.
     Legacy unprefixed state fields remain aliases for post-transition values.
     A winner is paid only if the episode survives the entire horizon.
-
-    Work invested in t arrives during update t+d, after decisions and before risk.
-    Pending queues exist for every episode, including those with zero delays.
     """
     capability = np.zeros(2)
     safety = 0.0
@@ -195,65 +180,27 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
     max_post_gap = 0.0
     cumulative_hazard_exposure = 0.0
     catastrophe = False
-    steps = 0
-
-    # Each lab owns a map from arrival period to realized production amount.
-    # Entries beyond the horizon remain unfinished at termination.
-    pending_capability = [{}, {}]
-    pending_safety = [{}, {}]
-
-    def schedule_work(step, allocation):
-        nonlocal safety
-        shock = rng.lognormal(-0.5 * config.noise**2, config.noise, size=2)
-        produced = config.capability_rate * allocation * shock
-        for lab, delay in enumerate((config.capability_delay_a, config.capability_delay_b)):
-            if delay:
-                due = step + delay
-                pending_capability[lab][due] = pending_capability[lab].get(due, 0.0) + float(produced[lab])
-                produced[lab] = 0.0
-        capability[:] += produced
-        # Preserve the original shared-safety arithmetic when both are immediate.
-        if config.safety_delay_a == config.safety_delay_b == 0:
-            safety += config.safety_rate * float((1 - allocation).sum())
-        else:
-            for lab, delay in enumerate((config.safety_delay_a, config.safety_delay_b)):
-                amount = config.safety_rate * float(1 - allocation[lab])
-                if delay:
-                    due = step + delay
-                    pending_safety[lab][due] = pending_safety[lab].get(due, 0.0) + amount
-                else:
-                    safety += amount
-        # Always drain due work, independently of delays for new investments.
-        for lab in (0, 1):
-            if step in pending_capability[lab]:
-                capability[lab] += pending_capability[lab].pop(step)
-            if step in pending_safety[lab]:
-                safety += pending_safety[lab].pop(step)
-
     for step in range(1, config.horizon + 1):
-        observations = make_observations(step, config.horizon,
-                                          float(capability[0]), float(capability[1]), safety)
+        observations = make_observations(step, config.horizon, float(capability[0]),
+                                         float(capability[1]), safety)
+        # Both observations already exist; neither decision sees the other's action.
         chosen_a = policy_a.choose_allocation(observations[0])
         chosen_b = policy_b.choose_allocation(observations[1])
         allocation = np.array([validate_allocation(chosen_a), validate_allocation(chosen_b)])
-
-        schedule_work(step, allocation)
+        # Validation precedes state changes and all random draws.
+        # Mean-one lognormal multipliers keep progress nonnegative.
+        shock = rng.lognormal(-0.5 * config.noise**2, config.noise, size=2)
+        capability += config.capability_rate * allocation * shock
+        safety += config.safety_rate * float((1 - allocation).sum())
         gap = max(0.0, float(capability.max()) - safety)
         hazard = float(-np.expm1(-config.hazard_scale * gap))
         catastrophe = bool(rng.random() < hazard)
-
+        # Observe the executed transition, including a terminal catastrophe period.
         allocation_sum += allocation
         allocation_zero_periods += allocation == 0
         allocation_one_periods += allocation == 1
         max_post_gap = max(max_post_gap, gap)
         cumulative_hazard_exposure += config.hazard_scale * gap
-        steps = step
-
-        pending_capability_a = sum(pending_capability[0].values(), 0.0)
-        pending_capability_b = sum(pending_capability[1].values(), 0.0)
-        pending_safety_a = sum(pending_safety[0].values(), 0.0)
-        pending_safety_b = sum(pending_safety[1].values(), 0.0)
-
         if trace:
             history.append(dict(step=step, horizon=config.horizon,
                                 pre_capability_a=observations[0].own_capability,
@@ -267,14 +214,9 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
                                 post_safety=safety, post_gap=gap, post_hazard=hazard,
                                 post_catastrophe=catastrophe, capability_a=float(capability[0]),
                                 capability_b=float(capability[1]), safety=safety,
-                                gap=gap, hazard=hazard, catastrophe=catastrophe,
-                                pending_capability_a=pending_capability_a,
-                                pending_capability_b=pending_capability_b,
-                                pending_safety_a=pending_safety_a,
-                                pending_safety_b=pending_safety_b))
+                                gap=gap, hazard=hazard, catastrophe=catastrophe))
         if catastrophe:
             break
-
     if catastrophe:
         payoff = np.full(2, -config.catastrophe_cost)
     elif capability[0] == capability[1]:
@@ -282,22 +224,17 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
     else:
         payoff = np.zeros(2)
         payoff[int(np.argmax(capability))] = config.first_mover_value
-
-    result = dict(steps=steps, catastrophe=catastrophe,
+    result = dict(steps=step, catastrophe=catastrophe,
                   capability_a=float(capability[0]), capability_b=float(capability[1]),
                   safety=safety, payoff_a=float(payoff[0]), payoff_b=float(payoff[1]))
-    result.update(mean_allocation_a=float(allocation_sum[0] / steps),
-                  mean_allocation_b=float(allocation_sum[1] / steps),
+    result.update(mean_allocation_a=float(allocation_sum[0] / step),
+                  mean_allocation_b=float(allocation_sum[1] / step),
                   allocation_zero_periods_a=int(allocation_zero_periods[0]),
                   allocation_zero_periods_b=int(allocation_zero_periods[1]),
                   allocation_one_periods_a=int(allocation_one_periods[0]),
                   allocation_one_periods_b=int(allocation_one_periods[1]),
                   max_post_gap=max_post_gap,
-                  cumulative_hazard_exposure=cumulative_hazard_exposure,
-                  pending_capability_a=sum(pending_capability[0].values(), 0.0),
-                  pending_capability_b=sum(pending_capability[1].values(), 0.0),
-                  pending_safety_a=sum(pending_safety[0].values(), 0.0),
-                  pending_safety_b=sum(pending_safety[1].values(), 0.0))
+                  cumulative_hazard_exposure=cumulative_hazard_exposure)
     if trace:
-        result['history'] = history
+        result["history"] = history
     return result

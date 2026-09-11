@@ -300,7 +300,7 @@ those actual histories with the unchanged experiment-seed/trial mapping for pair
 Only one episode's trace is buffered at a time, then written before the next trial.
 `--quiet` changes terminal output only, and `--dry-run` writes no trajectories.
 
-Runner metadata keeps metadata schema 1 and records additive output schema 2,
+Runner metadata keeps metadata schema 1 and records additive output schema 3,
 diagnostic definitions, whether full tracing is enabled, filename, file status,
 completed traced trials, and row counts. Exceptions close gzip output and mark an
 unfinished trace incomplete; successfully written earlier histories are retained.
@@ -313,3 +313,17 @@ states cannot be recovered from aggregate outcomes: regenerate with the matching
 source, configuration, policies, and seeds in a fresh directory if those traces
 are needed. No historical results were regenerated for this implementation.
 This is instrumentation, not a new mathematical model; model IDs are unchanged.
+
+
+Production delays are configured through `model.capability_delay_a`,
+`model.safety_delay_a`, `model.capability_delay_b`, and `model.safety_delay_b`.
+They default to zero and can be set or swept even when omitted from input JSON.
+Nonzero delays select FG-M004; zero-delay runs retain policy-based model IDs.
+Output schema 3 adds pending capability/safety amounts by lab to episodes and
+traces. See ../../docs/model.md for t+d update timing and terminal meaning.
+
+Example for review only (dry-run resolves settings without simulation or output):
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set model.capability_delay_a=1 --set model.capability_delay_b=1 --set model.safety_delay_a=2 --set model.safety_delay_b=2 --dry-run
+```

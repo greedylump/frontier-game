@@ -125,6 +125,29 @@ def test_identical_relative_rules_can_choose_different_actions():
     assert result['history'][1]['allocation_a'] != result['history'][1]['allocation_b']
 
 
+def test_delayed_arrivals_are_not_visible_to_current_observations():
+    class ProbePolicy:
+        def __init__(self):
+            self.observations = []
+        def choose_allocation(self, observation):
+            self.observations.append(observation)
+            return .5
+
+    a = ProbePolicy()
+    b = ProbePolicy()
+    cfg = Config(horizon=2, noise=0, hazard_scale=0, safety_rate=0.2,
+                 capability_rate=1.0, capability_delay_a=1,
+                 safety_delay_a=1, capability_delay_b=1,
+                 safety_delay_b=1)
+    result = simulate(cfg, a, b, np.random.default_rng(1), trace=True)
+    assert result["capability_a"] == result["capability_b"] == .5
+    assert result["safety"] == .2
+    assert a.observations[0] == Observation(1, 2, 0.0, 0.0, 0.0)
+    assert a.observations[1] == Observation(2, 2, 0.0, 0.0, 0.0)
+    assert b.observations[0] == Observation(1, 2, 0.0, 0.0, 0.0)
+    assert b.observations[1] == Observation(2, 2, 0.0, 0.0, 0.0)
+
+
 @pytest.mark.parametrize('bad', [-.1, 1.1, float('nan'), float('inf'), '0.5', None, True, 1j])
 @pytest.mark.parametrize('side', ['a', 'b'])
 def test_invalid_output_rejected_before_transition_or_random_draw(bad, side):

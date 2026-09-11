@@ -33,7 +33,8 @@ def test_example_and_default_resolution_without_simulation():
     example = json.loads(EXAMPLE.read_text(encoding='utf-8-sig'))
     config, a, b, resolved = runner.parse_config(example)
     assert asdict(config) == asdict(Config())
-    assert set(example['model']) == set(asdict(Config()))
+    assert set(example['model']) == set(asdict(Config())) - {
+        'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b'}
     assert resolved['trials'] == 1000 and resolved['seed'] == 2026
     assert a == SafetyGapPolicy(.6,.3,0) and b == SafetyGapPolicy(.5,.3,0) and a is not b
     minimal = deepcopy(example)

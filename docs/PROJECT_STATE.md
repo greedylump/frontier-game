@@ -1,17 +1,18 @@
 # Frontier Game: project state and handoff
 
 Prepared from the research conversation and saved results through run
-`sweep-20260911T031630014001Z`. Intended location: `docs/PROJECT_STATE.md`.
+`sweep-20260911T180613122294Z`, plus verified delay implementation.
 Read this first when resuming, then consult `MODEL_REGISTER.md`, source, and run
 metadata. Update this file after meaningful decisions or completed experiment batches.
 
 ## Current plan and decision discipline
 
 - Planned next experiment is recorded here for discussion and review only.
-- No implementation or execution of that proposed next experiment is authorized yet.
+- Delay implementation, integration, documentation, and verification are authorized.
+- Research delay runs are not authorized; the proposed experiment remains discussion only.
 - This file is the repository-forward source of truth for pending research decisions,
   and it should be updated after meaningful decisions or completed experiment batches.
-- The model register is being brought into alignment with the evidence in the
+- The model register is aligned with the evidence in the
   repository runs: FG-M002 and FG-M003 are no longer described as "small
   verification only" when the run history now includes research sweeps and broader
   experiment batches.
@@ -42,16 +43,13 @@ The user prefers VS Code to terminal-heavy workflows.
 - Main configurable runner: `experiments/laptop/run_experiment.py`.
 - Default adaptive config: `experiments/laptop/configs/graduated.json`.
 - Scientific model history: `docs/MODEL_REGISTER.md`.
-- That register still labels FG-M002/FG-M003 as "small verification only" in its
-  opening table. Extensive research runs now exist; reconcile those stale status
-  descriptions when updating it, without rewriting historical provenance.
 - The discussion session could read the repo but wrote analysis artifacts into
   `C:\Users\ab294\Documents\Codex\2026-09-07\referenced-chatgpt-conversation-this-is-an\outputs`.
   Those artifacts are NOT automatically part of the repository. Raw runs below
   are in the repo's local `results` directory. Ignored results are not necessarily
   backed up to GitHub.
 
-## Current scientific model: FG-M003
+## Research reference: FG-M003 (zero delays)
 
 Two symmetric players start with C_A=C_B=S=0. Each period each allocates a fraction
 a_i in [0,1] to capability, and 1-a_i to safety. Decisions are simultaneous from
@@ -206,7 +204,7 @@ Sweep directories (under results):
 External outputs: b-response-five-seeds, b-response-extended,
 b-response-through-1, b-response-above-1, b-response-through-10.
 
-### A response against B safety_response=10 (latest completed experiment)
+### A response against B safety_response=10
 
 | A k_G | A payoff | B payoff | Catastrophe |
 |---:|---:|---:|---:|
@@ -225,7 +223,7 @@ Paired A changes versus 0.05:
 Source: `sweep-20260911T031630014001Z`; reuse A=0.05,B=10 from prior sweep.
 External analysis: outputs/a-response-to-b10.
 No demonstrated equilibrium: search covers selected coefficients only, B optimum
-not bracketed, other policy families untested. Symmetry permits swapping roles;
+not bracketed, other policy families incompletely explored. Symmetry permits swapping roles;
 the search selected an asymmetric configuration, not spontaneous role emergence.
 
 ## Recent threshold-intervention update
@@ -247,14 +245,23 @@ Source and runner changes:
 - `experiments/laptop/configs/threshold_intervention.json`: example config for
   a threshold sweep with A as graduated and B as threshold_intervention.
 
-The first recorded sweep evidence in `results/sweep-20260911T050147286477Z`
-and `results/sweep-20260911T050226158766Z` used the command:
+The canonical retained sweep evidence is `results/sweep-20260911T050226158766Z`.
+The earlier `results/sweep-20260911T050147286477Z` was an uncommitted duplicate
+pre-commit rerun of the same four-configuration threshold-intervention sweep.
+The duplicate child folders `0001` through `0004` were byte-identical across
+corresponding episodes, input configs, summaries, and trajectories; only
+per-run metadata provenance fields such as timestamps differed. That duplicate
+run was removed after verification, so no duplicate independent evidence remains
+in the repository. The retained canonical run is therefore the sole seed-2026 evidence
+source for this sweep; subsequent new-seed comparisons are recorded below.
+
+The canonical retained run command was:
 
     .\.venv\Scripts\python.exe experiments\laptop\run_experiment.py
       --config experiments\laptop\configs\threshold_intervention.json
       --sweep policies.b.parameters.threshold=0.05,0.10,0.20,0.40
 
-The run completed and produced the following summary evidence:
+It produced the following summary evidence:
 
 | Threshold | Payoff A | Payoff B | Catastrophe |
 |---:|---:|---:|---:|
@@ -286,8 +293,7 @@ proven superior burst mechanism yet.
    online action selection. Use unseen seeds and alternative model assumptions
    for evaluation. Do not assume an optimizer's simulator success is realism.
 6. Challenge instant shared safety: delays, depreciation, limited productivity,
-   or imperfect sharing may weaken reactive bursts. These are proposals, not
-   currently implemented mechanisms.
+   or imperfect sharing may weaken reactive bursts. Delays are now implemented; the other mechanisms remain proposals.
 7. Challenge terminal winner-take-all payoff: second-place value and/or absolute
    capability returns. Preserve original model as a selectable baseline.
 8. Initial leader/challenger asymmetry and noisy/delayed observations.
@@ -306,3 +312,55 @@ proven superior burst mechanism yet.
   implementations, and completed runs distinctly.
 - Link this file from root README. Keep model definitions in MODEL_REGISTER and
   exact experimental details in metadata; this file is the navigation/handoff.
+
+
+## Latest completed experiment: five-seed threshold comparison
+
+Saved episode files were checked across seeds 2026?2030, 1,000 histories per seed
+and 5,000 per policy. New threshold seeds are in
+`results/sweep-20260911T180613122294Z`; seed 2026 is reused from
+`results/sweep-20260911T050226158766Z`. The graduated B=10 reference is in
+`results/sweep-20260911T030850898132Z` (filter B safety_response=10).
+
+| Policy for B | A payoff | B payoff | Catastrophes / 5,000 |
+|---|---:|---:|---:|
+| Graduated B=10 | 8.212 | 0.886 | 41 |
+| Threshold 0.05 | 8.060 | 0.818 | 51 |
+| Threshold 0.10 | 7.974 | 0.772 | 57 |
+
+The comparison is completed, not merely proposed. B-payoff differences remain
+uncertain; neither threshold superiority nor equilibrium was established.
+An effort-matched timing comparison remains a separate possible future study.
+The duplicate-removal note above remains applicable; reused seed-2026 histories
+are counted once, not as fresh evidence.
+
+## Finished delay implementation and next discussion
+
+FG-M004 adds four independent capability/safety delays by lab, default zero.
+One production loop constructs decisions from previous effective stocks, invests
+and releases work due at t+d, then checks catastrophe. Pending queues retain
+realized amounts, arrival periods, and lab attribution, including beyond-horizon
+work. Existing policies cannot see pending amounts; only effective capability
+wins the prize and only effective stocks affect risk. Catastrophe stops arrivals.
+Zero-delay runs retain policy-based model IDs and exact old fields/RNG consumption;
+output schema 3 adds pending diagnostics consistently, so files are not claimed
+byte-identical. See model.md and MODEL_REGISTER.md for definitions and provenance.
+
+Verification uses a test-only reference from Git f9774c1796c37a714379270828a8f604da567609,
+exact zero-delay comparisons (including final RNG state), deterministic timing and
+conservation checks, terminal/fatal cases, and tiny temporary runner outputs.
+Final verification: `python -m pytest -q --basetemp .pytest-tmp-delay-final`
+passed all 399 tests; `git diff --check` passed. The default temporary directory
+initially produced permission errors; repository-local temporary outputs worked.
+Two override regressions found during verification were corrected before this
+passing full-suite run. Source remains uncommitted for review; no research
+experiment was launched.
+
+Unimplemented: incident-driven additive/replacement delays; rescheduling pending
+work; temporary/permanent restrictions and release gates; pending-aware policies;
+recoverable incidents and remediation; counting pending capability as risk while
+withholding credit for pending safety.
+
+Proposed first delay experiment, for discussion only: hold the graduated reference
+policies fixed and compare symmetric capability/safety delay pairs (0,0), (1,1),
+(1,2), and (2,1). Do not execute without research authorization.

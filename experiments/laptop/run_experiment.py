@@ -35,7 +35,10 @@ POLICY_TYPES = {'fixed': FixedPolicy,
                 'threshold_intervention': ThresholdInterventionPolicy}
 
 
-def model_id_for(policy_a, policy_b):
+def model_id_for(policy_a, policy_b, config=None):
+    if config is not None and any(getattr(config, name, 0) != 0 for name in (
+            'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b')):
+        return 'FG-M004'
     if any(isinstance(policy, (GraduatedPolicy, ThresholdInterventionPolicy)) for policy in (policy_a, policy_b)):
         return 'FG-M003'
     if any(isinstance(policy, SafetyGapPolicy) for policy in (policy_a, policy_b)):
@@ -133,9 +136,11 @@ def apply_overrides(document, specifications):
             original = original[part]
             target = target[part]
         leaf = parts[-1]
-        if not isinstance(original, dict) or leaf not in original:
+        default_delay = (parts[:-1] == ['model'] and leaf in (
+            'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b'))
+        if not isinstance(original, dict) or (leaf not in original and not default_delay):
             raise ValueError(f'--set: unknown path: {path}')
-        if isinstance(original[leaf], (dict, list)):
+        if isinstance(original.get(leaf), (dict, list)):
             raise ValueError(f'--set {path}: target must be an existing scalar field')
         try:
             value = json.loads(raw_value, parse_constant=reject_constant)
@@ -156,7 +161,7 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
     """The same execution and output format for single runs and sweep members."""
     config, policy_a, policy_b, resolved = prepared
     seed, trials = resolved['seed'], resolved['trials']
-    metadata = dict(model_id=model_id_for(policy_a, policy_b),
+    metadata = dict(model_id=model_id_for(policy_a, policy_b, config=config),
                     metadata_schema_version=1, output_schema_version=OUTPUT_SCHEMA_VERSION, run_id=output.name,
                     diagnostics=dict(definitions=DIAGNOSTIC_DEFINITIONS,
                         periods='Executed periods only, including terminal catastrophe.'),
@@ -174,6 +179,7 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
                                      period_indexing='1 through horizon, inclusive',
                                      fields=['period', 'horizon', 'own_capability', 'opponent_capability', 'shared_safety'],
                                      simultaneous=True, current_opponent_action_visible=False,
+                                     pending_work_visible=False, stocks_at="end of previous completed period",
                                      fixed_policies_ignore_observations=True),
                     seed=seed, trials=trials, completed_trials=0,
                     trial_seed_rule='numpy SeedSequence(seed).spawn(trials)', trajectory_seed=seed+1,
@@ -324,7 +330,7 @@ def execute_sweep(source, document, args, plans, csv_source, command, provenance
                     experiments=[dict(experiment_id=i, output_path=f'{i:04d}', status='pending',
                         varied_parameters=plan['varied_parameters'], overrides=plan['overrides'],
                         resolved_config=plan['prepared'][3], seed=plan['prepared'][3]['seed'],
-                        model_id=model_id_for(plan['prepared'][1], plan['prepared'][2]))
+                        model_id=model_id_for(plan['prepared'][1], plan['prepared'][2], config=plan['prepared'][0]))
                         for i, plan in enumerate(plans, 1)], **provenance)
     output.mkdir(parents=True, exist_ok=False)
     save_manifest(output, manifest)

@@ -25,6 +25,8 @@ identification of affected runs, even if the intended scientific model is unchan
 | FG-M002 | Per-period policies with exact observations | Implemented; research runs exist; not limited to small verification | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
 | FG-M003 | Graduated relative-position and safety response | Implemented; research runs exist; not limited to small verification | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
 
+| FG-M004 | Delayed capability and shared-safety production | Implemented; verification only, no research runs authorized | FG-M003 | Lab-specific investment-to-effect delays and unfinished production |
+
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
 parent, changed assumptions, retained assumptions, limitations, implementation commit,
@@ -213,7 +215,8 @@ safety_response=0.20. These are illustrative, not optimized. This is a prescribe
 rule, not online optimization, learning, or an equilibrium claim. Coefficients do
 not change during an episode; no policy state carries between episodes.
 
-Any run containing a graduated policy is FG-M003, including mixed-policy pairs.
+With zero delays, any run containing a graduated or threshold-intervention policy
+is FG-M003, including mixed-policy pairs.
 Without graduated policies, the previous FG-M001/FG-M002 assignments remain.
 The numerical configuration and chosen policy parameters are recorded per run;
 metadata schema remains 1. Implementation revision: current uncommitted changes;
@@ -238,3 +241,38 @@ and excluded from the summary. Historical output schema/metadata is not rewritte
 Older tables without diagnostics remain valid for their existing analyses; recovering
 missing states requires matching-source/config/seed regeneration into a new run.
 Only tiny verification experiments were executed when adding this instrumentation.
+
+
+## FG-M004: delayed production
+
+Purpose: test how investment-to-effect timing changes reactive safety and competition.
+Parent: FG-M003; all existing policy families remain available. Any of the four
+nonzero production delays selects FG-M004 for both individual metadata and sweep
+manifest entries. All-zero configurations retain the previous policy-based IDs.
+
+Changed assumption: capability and safety can take independent nonnegative integer
+numbers of periods by lab to become effective. Investment in t arrives during
+update t+d, after both decisions and before risk. Realized capability productivity
+is drawn at investment. Safety remains deterministic and shared upon arrival.
+Pending work is hidden from policies, contributes neither risk nor protection,
+and has no terminal prize value. Beyond-horizon work is retained as unfinished;
+catastrophe terminates immediately without processing later arrivals.
+
+Retained: zero initial stocks, simultaneous decisions, existing policy rules,
+noise distribution and draw order, gap/hazard function, and terminal rank payoffs.
+See [model.md](model.md) for precise timing and unimplemented future mechanisms.
+
+Implementation revision: uncommitted working-tree changes; no new commit claimed.
+Associated research run IDs: none. Only temporary test cases have been run;
+research delay experiments require separate authorization. The unfinished local
+implementation incorrectly used t+d+1 and released arrivals before observations;
+this correction replaces its two production loops with one. No historical saved
+research output or metadata has been changed or attributed to the corrected code.
+
+Output schema 3 adds four lab-attributed pending amounts to episodes and traces,
+including zeros with zero delays. Measurements follow investment and arrivals in
+each executed period; episode values are terminal unfinished amounts. Existing
+fields are preserved exactly for zero delays, including RNG state, as checked
+against Git revision f9774c1796c37a714379270828a8f604da567609 in test infrastructure.
+Metadata schema stays 1; full Monte Carlo trajectories remain optional and disabled
+by default. Historical schema-2 documentation above describes earlier outputs.
