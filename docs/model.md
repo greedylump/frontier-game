@@ -63,7 +63,7 @@ IDs, retained FG-M001 interpretation, and provenance limitations.
 `capability_delay_a`, `safety_delay_a`, `capability_delay_b`, and `safety_delay_b`
 default to zero. Each accepts a nonnegative integer, rejecting booleans, fractions,
 and negatives. These transition rules were introduced as FG-M004. Current runs
-use FG-M005 for the expanded information interface; their `behavior_model_id`
+using legacy policies use FG-M005 for the expanded information interface; their `behavior_model_id`
 records FG-M004 with delays, or FG-M001/FG-M002/FG-M003 without delays.
 
 Work invested in period t with delay d becomes effective during the update of
@@ -101,7 +101,7 @@ policies, with and without tracing. This is numerical/behavioral compatibility,
 not byte-identical files: new columns and resolved configuration fields are added.
 
 Dynamic incident-driven additive/replacement delays, rescheduling pending work,
-temporary/permanent restrictions and release gates, pending-aware policies,
+temporary/permanent restrictions and release gates,
 recoverable incidents/remediation, and counting pending capability as risk while
 withholding credit for pending safety are all unimplemented.
 
@@ -110,7 +110,7 @@ withholding credit for pending safety are all unimplemented.
 
 The observation boundary is true engine state -> `make_observations` -> immutable
 `Observation` -> policy. The builder copies both views before either decision;
-it neither advances queues nor consumes randomness. Existing policies are unchanged
+it neither advances queues nor consumes randomness. Legacy fixed, safety-gap, graduated, and threshold policies are unchanged
 and ignore the added information. The delay engine and actual gap/hazard calculation
 remain unchanged: only effective capability and effective shared safety enter risk.
 
@@ -148,8 +148,8 @@ or misreporting, and regulatory restrictions/reporting transformations/audit err
 belong at the observation boundary. They are unimplemented. Stochastic observation
 rules must use a separate random stream to avoid changing physical productivity
 and catastrophe draws. No unused observation RNG, registry, or reporting actions
-are introduced. Policies using pending work are the next design step, outside this
-implementation; no pending-aware or forward-looking policy is implemented.
+are introduced. FG-M006 below adds a pending-aware measure; planning rollouts
+and optimization of future actions remain unimplemented.
 
 Runner observation metadata uses `exact-pending-pre-decision-v1` and lists fields,
 timing, visibility, and exclusions. New JSON run/sweep and safety-gap runner metadata
@@ -158,3 +158,60 @@ reproduced by existing policies. Metadata schema 1 and output schema 3 are retai
 no episode or trajectory columns change and schedules are not serialized by default.
 Existing pending-total diagnostics measure post-update unfinished work, whereas
 policy schedules are pre-decision snapshots. Historical outputs/metadata are untouched.
+
+
+## Pending-aware graduated policy (FG-M006)
+
+`PendingAwareGraduatedPolicy`, JSON identifier `pending_aware_graduated`, retains
+`base_allocation=0.6`, `deficit_response=0.1`, and `safety_response=0.2` and adds
+`capability_lookahead=None` and `safety_lookahead=None`. Lookaheads accept only None
+(JSON `null`) or nonnegative integers; booleans, fractions, negative values, and
+strings are rejected. Coefficient validation is inherited from GraduatedPolicy.
+
+For each category independently, None ignores its pending schedules entirely.
+Zero includes due-now work. Integer k selects records whose absolute arrival period
+satisfies `observation.period <= arrival_period <= observation.period + k`.
+The window is applied to both own/opponent schedules of that category. No cutoff
+is imposed at the episode horizon: beyond-horizon work counts if within the window.
+When a window is enabled, both relevant schedules must be available; None raises
+a field-specific error while an empty tuple contributes zero. Ignored categories
+need no schedule information. Configured investment delays do not choose the window.
+
+Let P_i/P_j be selected own/opponent pending capability and P_S the sum of selected
+own and opponent pending safety contributions. With effective stocks C_i, C_j, S:
+
+```text
+anticipated_gap = max(0, max(C_i + P_i, C_j + P_j) - (S + P_S))
+deficit = C_j - C_i
+allocation = clip(base_allocation + deficit_response * deficit
+                  - safety_response * anticipated_gap, 0, 1)
+```
+
+The deficit uses effective capability only. Both lookaheads None delegates directly
+to GraduatedPolicy for exact behavior, including stock-only observations. The new
+policy has no memory, randomness, predictions of investment/actions/shocks, learning,
+or rollouts. Pending amounts are exact realized investment-time production under
+the perfect-information observation assumption; they are not redrawn or rescaled.
+
+This is one prescribed policy measure, not physical catastrophe risk. It can count
+later safety against earlier capability exposure, can fall below the current gap,
+and can credit work that earns no terminal prize or protection within the horizon.
+It neither takes a maximum over future gaps nor claims simultaneous arrivals or
+optimized future actions. Physical transitions, arrival timing, effective-stock
+hazard calculation, observations, and existing policies remain unchanged.
+
+Runs containing this policy family use model_id FG-M006 even in ignore mode.
+If either policy enables either window (including 0), behavior_model_id is FG-M006,
+even if realized queues happen to be empty. If all windows are None, the inherited
+graduated behavior is FG-M003 with zero delays or FG-M004 with nonzero delays.
+Other policy families retain FG-M005 and their earlier behavior classification.
+Metadata schema 1, output schema 3, and observation ID exact-pending-pre-decision-v1
+remain unchanged. Resolved policy metadata includes both nullable lookaheads.
+No full schedules or new trajectory columns are saved; full traces stay off by default.
+
+The example `experiments/laptop/configs/pending_aware_graduated.json` explicitly
+includes both lookaheads for each player so --set and --sweep can address them.
+JSON null is accepted in lookahead sweep axes; unrelated numeric axes stay strict.
+The example matches the saved symmetric (1,2) delay baseline's coefficients and
+starts in ignore mode. A comparison of independently chosen windows against that
+baseline is proposed for discussion only, not executed or evidence of superiority.

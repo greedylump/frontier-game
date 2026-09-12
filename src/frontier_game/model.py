@@ -168,7 +168,7 @@ def observation_metadata() -> dict:
                 future_shocks_visible=False, policy_internals_visible=False,
                 mutable_queues_visible=False, rng_state_visible=False,
                 fixed_policies_ignore_observations=True,
-                existing_policies_ignore_pending_and_delays=True,
+                legacy_policies_ignore_pending_and_delays=True,
                 diagnostics='Output pending totals are post-update diagnostics, not pre-decision schedules; schedules are not serialized.')
 
 
@@ -236,6 +236,50 @@ class GraduatedPolicy:
                   - observation.shared_safety)
         allocation = (self.base_allocation + self.deficit_response * deficit
                       - self.safety_response * gap)
+        return float(np.clip(allocation, 0.0, 1.0))
+
+
+@dataclass(frozen=True)
+class PendingAwareGraduatedPolicy(GraduatedPolicy):
+    """Prescribed gap measure using independent inclusive pending-work windows.
+
+    None ignores a category; 0 includes due-now work. Cutoffs are not capped at
+    the horizon. This measure can offset early capability with later safety;
+    it is not a forecast of physical hazard or a maximum over future gaps.
+    """
+    capability_lookahead: int | None = None
+    safety_lookahead: int | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        for name in ('capability_lookahead', 'safety_lookahead'):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError(f'{name} must be a nonnegative integer or None')
+
+    def choose_allocation(self, observation: Observation) -> float:
+        if self.capability_lookahead is None and self.safety_lookahead is None:
+            return super().choose_allocation(observation)
+
+        def selected(name, lookahead):
+            if lookahead is None:
+                return 0.0
+            schedule = getattr(observation, name)
+            if schedule is None:
+                raise ValueError(f'{name} is unavailable but its lookahead is enabled')
+            return sum((item.amount for item in schedule
+                        if observation.period <= item.arrival_period <= observation.period + lookahead), 0.0)
+
+        own = selected('own_pending_capability', self.capability_lookahead)
+        opponent = selected('opponent_pending_capability', self.capability_lookahead)
+        safety = (selected('own_pending_safety', self.safety_lookahead)
+                  + selected('opponent_pending_safety', self.safety_lookahead))
+        anticipated_gap = max(0.0, max(observation.own_capability + own,
+                                     observation.opponent_capability + opponent)
+                              - (observation.shared_safety + safety))
+        deficit = observation.opponent_capability - observation.own_capability
+        allocation = (self.base_allocation + self.deficit_response * deficit
+                      - self.safety_response * anticipated_gap)
         return float(np.clip(allocation, 0.0, 1.0))
 
 

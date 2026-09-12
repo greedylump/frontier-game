@@ -1,4 +1,4 @@
-"""Run independently configured fixed, safety-gap, graduated, or threshold-intervention policies from strict JSON."""
+"""Run independently configured policies, including pending-aware graduated rules, from strict JSON."""
 import argparse
 import csv
 import gzip
@@ -20,7 +20,7 @@ from time import perf_counter, sleep
 import numpy as np
 import pandas as pd
 from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION, observation_metadata
-from frontier_game import (Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy,
+from frontier_game import (Config, FixedPolicy, GraduatedPolicy, PendingAwareGraduatedPolicy, SafetyGapPolicy,
                             ThresholdInterventionPolicy, run_trials, simulate, summarize)
 
 # Support both direct script execution and package imports in tests.
@@ -32,16 +32,23 @@ else:
 POLICY_TYPES = {'fixed': FixedPolicy,
                 'safety_gap': SafetyGapPolicy,
                 'graduated': GraduatedPolicy,
+                'pending_aware_graduated': PendingAwareGraduatedPolicy,
                 'threshold_intervention': ThresholdInterventionPolicy}
 
 
 def model_id_for(policy_a, policy_b, config=None):
-    """Current allowed information is FG-M005 even when existing rules ignore it."""
+    """New policy family is FG-M006; previous policies retain FG-M005."""
+    if any(isinstance(p, PendingAwareGraduatedPolicy) for p in (policy_a, policy_b)):
+        return 'FG-M006'
     return 'FG-M005'
 
 
 def behavior_model_id_for(policy_a, policy_b, config=None):
     """Earlier scientific interpretation reproduced by the existing policy rules."""
+    if any(isinstance(p, PendingAwareGraduatedPolicy) and
+           (p.capability_lookahead is not None or p.safety_lookahead is not None)
+           for p in (policy_a, policy_b)):
+        return 'FG-M006'
     if config is not None and any(getattr(config, name, 0) != 0 for name in (
             'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b')):
         return 'FG-M004'
@@ -68,6 +75,9 @@ def construct_parameters(cls, parameters, location):
     required = [f.name for f in definitions if f.default is MISSING and f.default_factory is MISSING]
     check_keys(parameters, [f.name for f in definitions], required, location)
     for name, value in parameters.items():
+        if (cls is PendingAwareGraduatedPolicy and
+                name in ('capability_lookahead', 'safety_lookahead') and value is None):
+            continue
         if type(value) not in (int, float):
             raise ValueError(f'{location}.{name} must be a number (not a boolean or string)')
     try:
@@ -278,7 +288,10 @@ def sweep_rows(specifications, csv_source=None):
                 value = json.loads(raw, parse_constant=reject_constant)
             except ValueError as error:
                 raise ValueError(f'--sweep {path}: invalid numeric value: {raw!r}') from error
-            if type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value)):
+            nullable_lookahead = path in (
+                'policies.a.parameters.capability_lookahead', 'policies.a.parameters.safety_lookahead',
+                'policies.b.parameters.capability_lookahead', 'policies.b.parameters.safety_lookahead')
+            if not (value is None and nullable_lookahead) and (type(value) not in (int, float) or (isinstance(value, float) and not math.isfinite(value))):
                 raise ValueError(f'--sweep {path}: values must be finite numbers')
             axis.append(f'{path}={raw}')
         axes.append(axis)

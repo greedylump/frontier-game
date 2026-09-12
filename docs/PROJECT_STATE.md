@@ -314,7 +314,7 @@ proven superior burst mechanism yet.
   exact experimental details in metadata; this file is the navigation/handoff.
 
 
-## Latest completed experiment: five-seed threshold comparison
+## Completed five-seed threshold comparison
 
 Saved episode files were checked across seeds 2026-2030, 1,000 histories per seed
 and 5,000 per policy. New threshold seeds are in
@@ -359,7 +359,7 @@ passing full-suite run. The delay implementation was subsequently committed as
 673f6d21dec32ba2d85cfcc00049ceaa537072c9; no delay research experiment was launched.
 
 Unimplemented: incident-driven additive/replacement delays; rescheduling pending
-work; temporary/permanent restrictions and release gates; pending-aware policies;
+work; temporary/permanent restrictions and release gates;
 recoverable incidents and remediation; counting pending capability as risk while
 withholding credit for pending safety.
 
@@ -368,7 +368,7 @@ policies fixed and compare symmetric capability/safety delay pairs (0,0), (1,1),
 (1,2), and (2,1). Do not execute without research authorization.
 
 
-## Pending-work observation extension: implemented, policy still proposed
+## Pending-work observation extension (FG-M005 history)
 
 FG-M005 adds `own_pending_capability`, `opponent_pending_capability`,
 `own_pending_safety`, `opponent_pending_safety`, `own_capability_delay`,
@@ -400,9 +400,9 @@ post-update diagnostics, distinct from policy observations. Historical files and
 duplicate threshold-run removal note above are preserved.
 
 Implementation and verification are authorized; research runs are not. Changes remain
-uncommitted for review. The next step is choosing and implementing a policy that uses
-pending information, outside this task. Uncertain observations, cheating, regulatory
-reporting, pending-aware policies, dynamic delays/rescheduling, restrictions/release
+uncommitted for review at the observation-extension handoff. The pending-aware
+policy is now implemented as described in the FG-M006 update below. Uncertain observations, cheating, regulatory
+reporting, dynamic delays/rescheduling, restrictions/release
 gates, and remediation remain unimplemented. The proposed delay comparison above
 remains for discussion only.
 
@@ -418,3 +418,56 @@ with zero/nonzero delays, survival/catastrophe, and tracing on/off. Timing, pers
 immutability, retained snapshots, known-empty/unavailable information, current-action
 exclusions, and both runners' metadata were also checked. Only temporary test outputs
 were created; no research experiments or historical output changes were made.
+
+
+## Pending-aware graduated policy implemented (FG-M006)
+
+PendingAwareGraduatedPolicy is exported and selectable as pending_aware_graduated.
+It retains base_allocation=.6, deficit_response=.1, safety_response=.2 and adds
+capability_lookahead and safety_lookahead, both default None (JSON null). None
+ignores a category; zero counts due-now work; k includes current period through
+period+k inclusive, with no horizon cap. Both labs use the same window per category.
+Enabled windows require both schedules; known-empty is valid, unavailable is an error.
+
+With selected own/opponent pending capability P_i/P_j and combined pending safety P_S,
+anticipated_gap=max(0,max(C_i+P_i,C_j+P_j)-(S+P_S)). Allocation is
+clip(base_allocation + deficit_response*(C_j-C_i) - safety_response*anticipated_gap,0,1).
+The deficit remains effective-stock based. Both None delegates to GraduatedPolicy.
+Exact realized pending amounts are used without new shocks or rescaling.
+
+This is a policy measure under perfect information, not physical risk or a forecast.
+It can count later safety against earlier exposure and does not optimize future
+choices. No current-gap floor or maximum-over-future-gaps correction is imposed.
+Transitions, observations, arrival timing, and actual catastrophe risk are unchanged.
+No learning, memory, rollouts, or dynamic delays were added.
+
+The new family is FG-M006. Active windows (including zero) give behavior_model_id
+FG-M006. Both None preserves FG-M003 behavior with zero delays or FG-M004 with delays.
+Old policy families remain FG-M005. Resolved metadata records nullable lookaheads;
+output schema 3 and metadata schema 1 remain, with no full schedules added to rows
+and full tracing still optional/off. The example config explicitly includes both
+lookaheads for --set/--sweep, including null and zero.
+
+Saved (1,2) delay baseline: results/sweep-20260911T204618486225Z, children 0001-0005,
+seeds 2026-2030, 1,000 histories each. Saved metadata confirms symmetric capability
+delay 1/safety delay 2, graduated A safety_response=.05 and B=10, base=.6 and
+deficit_response=.1 for both, all complete. This supersedes the old note treating
+all delay runs as merely proposed; no baseline outputs were changed or regenerated.
+
+Proposed comparison, discussion only: hold baseline environment and coefficients
+fixed, retain both-None as the exact control, and choose capability/safety windows
+independently before running a paired comparison against the saved baseline.
+The example config matches the baseline and starts with both windows null for both
+players. No pending-aware research experiment is authorized or launched, and no
+superiority or equilibrium claim is made. Implementation remains uncommitted for review.
+
+
+Verification: 568 tests passed with `python -m pytest -q --basetemp
+.pytest-tmp-pending-policy-full`. After the final metadata wording update,
+169 policy/observation tests passed with `python -m pytest tests/test_pending_policy.py
+tests/test_pending_observations.py -q --basetemp .pytest-tmp-pending-policy-final`.
+`git diff --check` passed. Checks cover exact ignore-mode actions, episodes, traces,
+and RNG states; inclusive independent windows, due-now versus future/past arrivals,
+both safety producers, effective deficit, unavailable/empty information, clipping,
+validation, beyond-horizon inclusion, unchanged physical risk, and null/zero JSON
+construction/overrides/sweeps/metadata. No research runs or result changes occurred.

@@ -1,0 +1,42 @@
+{
+  "name": "pending-aware-graduated",
+  "description": "Candidate pending-aware gap measure under symmetric capability delay 1 and safety delay 2. Review windows before research use.",
+  "category": "research",
+  "model": {
+    "horizon": 30,
+    "capability_rate": 1.0,
+    "safety_rate": 0.6,
+    "noise": 0.25,
+    "hazard_scale": 0.01,
+    "first_mover_value": 10.0,
+    "catastrophe_cost": 50.0,
+    "capability_delay_a": 1,
+    "safety_delay_a": 2,
+    "capability_delay_b": 1,
+    "safety_delay_b": 2
+  },
+  "trials": 1000,
+  "seed": 2026,
+  "policies": {
+    "a": {
+      "type": "pending_aware_graduated",
+      "parameters": {
+        "base_allocation": 0.6,
+        "deficit_response": 0.1,
+        "safety_response": 0.05,
+        "capability_lookahead": null,
+        "safety_lookahead": null
+      }
+    },
+    "b": {
+      "type": "pending_aware_graduated",
+      "parameters": {
+        "base_allocation": 0.6,
+        "deficit_response": 0.1,
+        "safety_response": 10,
+        "capability_lookahead": null,
+        "safety_lookahead": null
+      }
+    }
+  }
+}

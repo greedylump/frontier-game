@@ -336,3 +336,24 @@ horizon. Observation metadata describes this as `exact-pending-pre-decision-v1`.
 Existing policies ignore the added fields. Schedules are not serialized into every
 output row; pending-total columns remain post-update diagnostics. See
 [the model description](../../docs/model.md) for the full API and exclusions.
+
+
+### Pending-aware graduated policy
+
+`pending_aware_graduated` adds independent `capability_lookahead` and
+`safety_lookahead` to graduated coefficients. JSON `null` ignores that category;
+0 counts due-now work; k counts arrivals from the current period through period+k,
+including beyond-horizon records within the window. Enabled categories require
+known own/opponent schedules. The effective-capability deficit term stays unchanged.
+This anticipated gap is a policy measure, not actual catastrophe risk; it can credit
+later safety against earlier exposure. See [model.md](../../docs/model.md).
+
+The example has symmetric production delays (1,2), A safety response .05 and B=10,
+and both lookaheads explicitly null for each player. Runs use FG-M006; behavior ID
+is FG-M006 with any enabled window, otherwise FG-M004 for this delayed example.
+Overrides and sweeps accept null and zero for either lookahead. Default trace/output
+sizes are unchanged. Example for review only (resolves without running simulation):
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/pending_aware_graduated.json --set policies.b.parameters.capability_lookahead=0 --set policies.b.parameters.safety_lookahead=1 --dry-run
+```

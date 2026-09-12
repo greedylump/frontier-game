@@ -26,6 +26,7 @@ identification of affected runs, even if the intended scientific model is unchan
 | FG-M003 | Graduated relative-position and safety response | Implemented; research runs exist; not limited to small verification | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
 | FG-M004 | Delayed capability and shared-safety production | Implemented; verification only, no research runs authorized | FG-M003 | Lab-specific investment-to-effect delays and unfinished production |
 | FG-M005 | Exact pending-work observations | Implemented; verification only | FG-M004 | Exposes realized pending schedules and configured delays through immutable observations |
+| FG-M006 | Pending-aware graduated measure | Implemented; verification only | FG-M005 | Independent capability/safety lookahead windows in a prescribed policy gap |
 
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
@@ -320,3 +321,42 @@ Associated research run IDs: none; only temporary verification outputs. Test-onl
 frozen source from that revision provides exact comparisons of complete episode
 results, traces, and final RNG states with zero and nonzero delays for all four
 existing policy families, including trace-on/off and catastrophe cases.
+
+
+## FG-M006: configurable pending-aware graduated policy
+
+Purpose: compare prescribed responses to effective stocks plus selected pending
+work. Parent: FG-M005. Adds PendingAwareGraduatedPolicy (pending_aware_graduated)
+with capability_lookahead and safety_lookahead, independently None/null or integer
+k >= 0. None ignores the category; 0 selects due-now records. Include arrivals
+from current period through period+k inclusive, even beyond the horizon.
+
+The anticipated gap is max(0,max(C_i+P_i,C_j+P_j)-(S+P_S)); P_S includes both
+labs' selected safety contributions. Allocation clips base + deficit_response *
+(C_j-C_i) - safety_response * anticipated_gap. The deficit stays effective-stock
+based. Both None explicitly reuses GraduatedPolicy. Enabled windows require both
+schedules; unavailable information is an error, never assumed zero.
+
+Changed allowed behavior warrants FG-M006 for any run containing the new class,
+including mixed pairs and ignore mode. behavior_model_id is FG-M006 when at least
+one window is enabled, including zero, irrespective of whether current queues are
+empty. In all-ignore mode it retains graduated FG-M003 behavior with zero delays,
+or FG-M004 behavior with delays. Earlier families retain their FG-M005 model ID.
+Historical model classifications, outputs, and metadata are preserved.
+
+Retained: FG-M005 exact immutable observations, engine transitions and arrival timing,
+investment-time productivity shocks, effective-stock physical risk, terminal ranking,
+and all legacy policies. Metadata schema 1/output schema 3 stay unchanged; resolved
+policy parameters record nulls and integers. No full schedule output is added.
+
+Limitations: the measure can offset earlier exposure with later safety, includes
+beyond-horizon work within its window, and does not optimize actions or reconstruct
+the path of future gaps. No learning, memory, rollouts, dynamic delays, or extra
+random draws. See model.md for formula, validation, and information boundaries.
+
+Implementation revision: uncommitted changes based on b61541837613775e3ed3d9b564b78e406f8b4c15;
+no new commit claimed. Associated FG-M006 research run IDs: none. Only focused
+verification and tiny temporary runner checks are authorized here. Proposed future
+comparison: saved graduated (1,2) baseline results/sweep-20260911T204618486225Z,
+seeds 2026-2030, A safety_response=.05 and B=10, versus independently chosen windows.
+The saved baseline is prior evidence, not a new run or a pending-aware experiment.
