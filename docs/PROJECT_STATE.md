@@ -471,3 +471,36 @@ and RNG states; inclusive independent windows, due-now versus future/past arriva
 both safety producers, effective deficit, unavailable/empty information, clipping,
 validation, beyond-horizon inclusion, unchanged physical risk, and null/zero JSON
 construction/overrides/sweeps/metadata. No research runs or result changes occurred.
+
+
+## Decision-gap diagnostics implemented; research comparison pending
+
+Output schema 4 adds decision_gap_a/b only to full Monte Carlo trajectories.csv.gz
+when --save-trajectories is enabled. Episode, summary, and illustrative trajectory
+files remain unchanged. Supported policies report their exact pre-decision gap
+calculation: effective gap for graduated/threshold/safety-gap, anticipated gap for
+pending-aware graduated. Both-null windows give the effective gap. Fixed and
+unsupported custom policies report unavailable (None/blank), never assumed zero.
+
+A pure optional decision_gap(observation) calculation is shared with allocation
+logic. Diagnostics use the exact immutable decision observation, do not repeat
+allocation calls or draw randomness, and keep no per-policy diagnostic state.
+Ordinary traces do not request diagnostic recomputation. Scientific/behavior model
+IDs and metadata schema 1 remain unchanged; no historical results are rewritten.
+These fields explain the policy calculation, not whether a different decision
+would have prevented catastrophe. No storage-overhead measurement was performed.
+
+Planned comparison, for discussion only: B safety_response coefficients 1, 3, 10
+across (capability_lookahead, safety_lookahead) pairs (0,0), (1,1), (1,null), with
+physical capability delay 1 and safety delay 2. Research execution remains a
+separate user action. No research experiment is launched by this implementation;
+changes remain uncommitted for review.
+
+Verification: `python -m pytest -q --basetemp .pytest-tmp-decision-gap-full`
+passed all 607 tests. `git diff --check` passed. Focused checks cover supported
+policy measures, pending-safety credit reducing a positive effective gap to zero,
+null/zero and independent lookaheads, exact observations and one allocation call,
+fixed/custom blanks, unchanged outcomes/original trace fields/RNG state, no history
+state leakage, and file boundaries. Matched temporary runs produced byte-identical
+episode, summary, and illustrative CSVs with full tracing on/off. No compression
+or storage-overhead measurement was performed. Changes remain uncommitted.

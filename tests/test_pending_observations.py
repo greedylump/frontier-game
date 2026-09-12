@@ -153,7 +153,7 @@ def test_runner_metadata_and_no_schedule_output(tmp_path):
     assert meta['observation'] == observation_metadata()
     assert meta['observation']['fields'] == [f.name for f in fields(Observation)]
     assert meta['observation']['pending_work_visible']
-    assert meta['output_schema_version'] == 3 and meta['metadata_schema_version'] == 1
+    assert meta['output_schema_version'] == 4 and meta['metadata_schema_version'] == 1
     assert not meta['full_trajectories']['enabled']
     for filename in ('episodes.csv', 'trajectory.csv'):
         columns = pd.read_csv(output/filename).columns

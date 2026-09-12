@@ -19,7 +19,7 @@ from time import perf_counter, sleep
 
 import numpy as np
 import pandas as pd
-from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION, observation_metadata
+from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION, FULL_TRACE_DIAGNOSTIC_DEFINITIONS, observation_metadata
 from frontier_game import (Config, FixedPolicy, GraduatedPolicy, PendingAwareGraduatedPolicy, SafetyGapPolicy,
                             ThresholdInterventionPolicy, run_trials, simulate, summarize)
 
@@ -180,9 +180,12 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
     metadata = dict(model_id=model_id_for(policy_a, policy_b, config=config),
                     behavior_model_id=behavior_model_id_for(policy_a, policy_b, config=config),
                     metadata_schema_version=1, output_schema_version=OUTPUT_SCHEMA_VERSION, run_id=output.name,
+                    output_schema_note='Schema 4 adds only optional full-trace decision_gap_a/b; episode, summary, and illustrative columns unchanged from schema 3.',
                     diagnostics=dict(definitions=DIAGNOSTIC_DEFINITIONS,
                         periods='Executed periods only, including terminal catastrophe.'),
                     full_trajectories=dict(enabled=save_trajectories,
+                        schema_version=4, decision_gap_definitions=FULL_TRACE_DIAGNOSTIC_DEFINITIONS,
+                        unavailable_decision_gap='CSV blank',
                         filename='trajectories.csv.gz' if save_trajectories else None,
                         status='pending' if save_trajectories else 'disabled',
                         completed_trials=0, rows=0, buffering='one completed episode',
@@ -226,7 +229,7 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
             if save_trajectories:
                 trace_info['status'] = 'writing'
                 episodes = run_trials(config, policy_a, policy_b, trials=trials, seed=seed,
-                                      trace_sink=save_history)
+                                      trace_sink=save_history, trace_decision_gaps=True)
             else:
                 episodes = run_trials(config, policy_a, policy_b, trials=trials, seed=seed)
         if save_trajectories:

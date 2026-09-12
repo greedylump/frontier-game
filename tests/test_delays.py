@@ -116,7 +116,7 @@ def test_runner_delay_sweep_and_metadata(tmp_path):
                  '--sweep', 'model.capability_delay_a=0,1',
                  '--set', 'model.safety_delay_a=0', '--set', 'model.capability_delay_b=0', '--set', 'model.safety_delay_b=0'])
     manifest = json.loads((output/'manifest.json').read_text())
-    assert manifest['output_schema_version'] == 3
+    assert manifest['output_schema_version'] == 4
     assert manifest['observation']['pending_work_visible']
     assert all(e['model_id'] == 'FG-M005' for e in manifest['experiments'])
     assert [e['behavior_model_id'] for e in manifest['experiments']] == ['FG-M003', 'FG-M004']
@@ -127,7 +127,7 @@ def test_runner_delay_sweep_and_metadata(tmp_path):
         assert meta['observation'] == manifest['observation']
         assert meta['behavior_model_id'] == entry['behavior_model_id']
         assert meta['resolved_config'] == entry['resolved_config']
-        assert meta['output_schema_version'] == 3
+        assert meta['output_schema_version'] == 4
         assert all(k in meta['diagnostics']['definitions'] for k in PENDING)
         for filename in ('episodes.csv', 'trajectory.csv', 'trajectories.csv.gz'):
             assert set(PENDING) <= set(pd.read_csv(folder/filename).columns)

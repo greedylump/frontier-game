@@ -8,21 +8,26 @@ from .model import Config, Policy, simulate
 
 def run_trials(config: Config, policy_a: Policy, policy_b: Policy,
                trials: int = 1000, seed: int = 42, *,
-               trace_sink: Callable[[int, list[dict]], None] | None = None) -> pd.DataFrame:
+               trace_sink: Callable[[int, list[dict]], None] | None = None,
+               trace_decision_gaps: bool = False) -> pd.DataFrame:
     """Optionally deliver one completed episode trace at a time to trace_sink.
 
     The sink receives (zero-based trial ID, history). Trace buffering is bounded
     by one episode (at most config.horizon rows), not the trial count.
+    trace_decision_gaps opts this sink into policy-gap fields; it defaults off.
+    These fields never enter the returned episode DataFrame.
     """
     if type(trials) is not int or trials < 2:
         raise ValueError("trials must be an integer >= 2 for uncertainty estimates")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
+    if trace_decision_gaps and trace_sink is None:
+        raise ValueError('trace_decision_gaps requires a trace_sink')
     children = np.random.SeedSequence(seed).spawn(trials)
     outcomes = []
     for i, child in enumerate(children):
         outcome = simulate(config, policy_a, policy_b, np.random.default_rng(child),
-                           trace=trace_sink is not None)
+                           trace=trace_sink is not None, trace_decision_gaps=trace_decision_gaps)
         if trace_sink is not None:
             history = outcome.pop('history')
             trace_sink(i, history)

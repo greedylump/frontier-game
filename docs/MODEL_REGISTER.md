@@ -360,3 +360,18 @@ verification and tiny temporary runner checks are authorized here. Proposed futu
 comparison: saved graduated (1,2) baseline results/sweep-20260911T204618486225Z,
 seeds 2026-2030, A safety_response=.05 and B=10, versus independently chosen windows.
 The saved baseline is prior evidence, not a new run or a pending-aware experiment.
+
+
+## Instrumentation: optional full-trace output schema 4
+
+No new scientific model or behavior ID. The JSON runner's output schema 4 adds
+only decision_gap_a and decision_gap_b to optional trajectories.csv.gz. Episode,
+summary, and illustrative trajectory columns/values remain as in schema 3;
+metadata schema remains 1. Definitions live under full_trajectories metadata.
+These pre-decision policy measures use the exact decision observation; unavailable
+fixed/custom policy values are blank. They are neither physical hazard forecasts
+nor evidence that an alternative allocation would have prevented catastrophe.
+Pure policy calculations are shared with allocation rules, with no new allocation
+calls, mutable last-decision state, or random draws. See model.md for the optional
+interface and file boundaries. Historical outputs/classifications are untouched.
+Only tiny temporary verification runs are authorized for this instrumentation.

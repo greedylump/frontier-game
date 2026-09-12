@@ -357,3 +357,12 @@ sizes are unchanged. Example for review only (resolves without running simulatio
 ```powershell
 .\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/pending_aware_graduated.json --set policies.b.parameters.capability_lookahead=0 --set policies.b.parameters.safety_lookahead=1 --dry-run
 ```
+
+
+Full Monte Carlo traces now use output schema 4: --save-trajectories adds exactly
+`decision_gap_a` and `decision_gap_b` to `trajectories.csv.gz`. They describe the
+pre-decision effective or pending-aware gap used by each policy, not physical risk
+or a counterfactual outcome. Fixed/unsupported policies export blank values.
+`episodes.csv`, `summary.csv`, and illustrative `trajectory.csv` are unchanged.
+Full tracing remains optional/off. See [model.md](../../docs/model.md) for semantics
+and the pure optional diagnostic interface. Model IDs and metadata schema are unchanged.

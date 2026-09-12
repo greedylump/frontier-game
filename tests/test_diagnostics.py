@@ -96,7 +96,7 @@ def verify_saved(output):
     episodes=pd.read_csv(output/'episodes.csv')
     with gzip.open(output/'trajectories.csv.gz','rt') as stream:
         trace=pd.read_csv(stream)
-    assert meta['output_schema_version']==3
+    assert meta['output_schema_version']==4
     assert meta['full_trajectories']['status']=='complete'
     assert meta['full_trajectories']['filename']=='trajectories.csv.gz'
     assert meta['full_trajectories']['completed_trials']==len(episodes)
@@ -141,7 +141,7 @@ def test_sweep_traces(source,tmp_path):
     output=tmp_path/'sweep'
     runner.main(['--config',str(source),'--output',str(output),'--sweep','model.safety_rate=0.6,0.75','--save-trajectories','--quiet'])
     manifest=json.loads((output/'manifest.json').read_text())
-    assert manifest['save_trajectories'] and manifest['output_schema_version']==3
+    assert manifest['save_trajectories'] and manifest['output_schema_version']==4
     for experiment in manifest['experiments']:
         verify_saved(output/experiment['output_path'])
 

@@ -8,7 +8,11 @@ import numpy as np
 
 
 # Output schema is separate from scientific model classification.
-OUTPUT_SCHEMA_VERSION = 3
+OUTPUT_SCHEMA_VERSION = 4
+FULL_TRACE_DIAGNOSTIC_DEFINITIONS = {
+    name: "Pre-decision gap used by this policy from its exact decision observation; None/CSV blank when unsupported or unused. Not physical risk or a counterfactual claim."
+    for name in ("decision_gap_a", "decision_gap_b")
+}
 DIAGNOSTIC_DEFINITIONS = {
     'mean_allocation_a': 'Sum of A allocations divided by executed periods.',
     'mean_allocation_b': 'Sum of B allocations divided by executed periods.',
@@ -112,6 +116,8 @@ class Policy(Protocol):
 
     run_trials reuses policy instances. Built-in policies are immutable.
     """
+    # Optional decision_gap(observation) -> float | None diagnostics must be pure,
+    # deterministic, and read-only. choose_allocation alone remains sufficient.
     def choose_allocation(self, observation: Observation) -> float: ...
 
 
@@ -206,9 +212,12 @@ class SafetyGapPolicy:
                 or not math.isfinite(self.gap_threshold) or self.gap_threshold < 0):
             raise ValueError("gap_threshold must be finite and nonnegative")
 
+    def decision_gap(self, observation: Observation) -> float:
+        return max(0.0, max(observation.own_capability, observation.opponent_capability)
+                   - observation.shared_safety)
+
     def choose_allocation(self, observation: Observation) -> float:
-        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
-                  - observation.shared_safety)
+        gap = self.decision_gap(observation)
         return self.cautious_allocation if gap > self.gap_threshold else self.normal_allocation
 
 
@@ -230,10 +239,13 @@ class GraduatedPolicy:
                     or not math.isfinite(value) or value < 0):
                 raise ValueError(f'{name} must be finite and nonnegative')
 
+    def decision_gap(self, observation: Observation) -> float:
+        return max(0.0, max(observation.own_capability, observation.opponent_capability)
+                   - observation.shared_safety)
+
     def choose_allocation(self, observation: Observation) -> float:
         deficit = observation.opponent_capability - observation.own_capability
-        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
-                  - observation.shared_safety)
+        gap = self.decision_gap(observation)
         allocation = (self.base_allocation + self.deficit_response * deficit
                       - self.safety_response * gap)
         return float(np.clip(allocation, 0.0, 1.0))
@@ -257,9 +269,9 @@ class PendingAwareGraduatedPolicy(GraduatedPolicy):
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f'{name} must be a nonnegative integer or None')
 
-    def choose_allocation(self, observation: Observation) -> float:
+    def decision_gap(self, observation: Observation) -> float:
         if self.capability_lookahead is None and self.safety_lookahead is None:
-            return super().choose_allocation(observation)
+            return super().decision_gap(observation)
 
         def selected(name, lookahead):
             if lookahead is None:
@@ -274,9 +286,14 @@ class PendingAwareGraduatedPolicy(GraduatedPolicy):
         opponent = selected('opponent_pending_capability', self.capability_lookahead)
         safety = (selected('own_pending_safety', self.safety_lookahead)
                   + selected('opponent_pending_safety', self.safety_lookahead))
-        anticipated_gap = max(0.0, max(observation.own_capability + own,
-                                     observation.opponent_capability + opponent)
-                              - (observation.shared_safety + safety))
+        return max(0.0, max(observation.own_capability + own,
+                            observation.opponent_capability + opponent)
+                   - (observation.shared_safety + safety))
+
+    def choose_allocation(self, observation: Observation) -> float:
+        if self.capability_lookahead is None and self.safety_lookahead is None:
+            return super().choose_allocation(observation)
+        anticipated_gap = self.decision_gap(observation)
         deficit = observation.opponent_capability - observation.own_capability
         allocation = (self.base_allocation + self.deficit_response * deficit
                       - self.safety_response * anticipated_gap)
@@ -304,9 +321,12 @@ class ThresholdInterventionPolicy:
                 or not math.isfinite(self.threshold) or self.threshold < 0):
             raise ValueError('threshold must be finite and nonnegative')
 
+    def decision_gap(self, observation: Observation) -> float:
+        return max(0.0, max(observation.own_capability, observation.opponent_capability)
+                   - observation.shared_safety)
+
     def choose_allocation(self, observation: Observation) -> float:
-        gap = max(0.0, max(observation.own_capability, observation.opponent_capability)
-                  - observation.shared_safety)
+        gap = self.decision_gap(observation)
         if gap > self.threshold:
             return 0.0
         deficit = observation.opponent_capability - observation.own_capability
@@ -315,7 +335,8 @@ class ThresholdInterventionPolicy:
 
 
 def simulate(config: Config, policy_a: Policy, policy_b: Policy,
-             rng: np.random.Generator, *, trace: bool = False) -> dict:
+             rng: np.random.Generator, *, trace: bool = False,
+             trace_decision_gaps: bool = False) -> dict:
     """Run one episode. Randomness belongs to the caller, never global state.
 
     A trace records pre-transition decisions and post-transition outcomes.
@@ -324,7 +345,11 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
 
     Work invested in t arrives during update t+d, after decisions and before risk.
     Pending queues exist for every episode, including those with zero delays.
+    trace_decision_gaps adds two optional policy measures to history only and
+    requires trace=True. Ordinary traces retain their original columns.
     """
+    if trace_decision_gaps and not trace:
+        raise ValueError('trace_decision_gaps requires trace=True')
     capability = np.zeros(2)
     safety = 0.0
     history = []
@@ -378,6 +403,13 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
         chosen_b = policy_b.choose_allocation(observations[1])
         allocation = np.array([validate_allocation(chosen_a), validate_allocation(chosen_b)])
 
+        if trace_decision_gaps:
+            # Reuse the exact immutable views, without another allocation call.
+            decision_gaps = []
+            for policy, observation in zip((policy_a, policy_b), observations):
+                diagnostic = getattr(policy, 'decision_gap', None)
+                decision_gaps.append(diagnostic(observation) if callable(diagnostic) else None)
+
         schedule_work(step, allocation)
         gap = max(0.0, float(capability.max()) - safety)
         hazard = float(-np.expm1(-config.hazard_scale * gap))
@@ -413,6 +445,8 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
                                 pending_capability_b=pending_capability_b,
                                 pending_safety_a=pending_safety_a,
                                 pending_safety_b=pending_safety_b))
+            if trace_decision_gaps:
+                history[-1].update(decision_gap_a=decision_gaps[0], decision_gap_b=decision_gaps[1])
         if catastrophe:
             break
 

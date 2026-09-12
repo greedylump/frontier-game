@@ -215,3 +215,42 @@ JSON null is accepted in lookahead sweep axes; unrelated numeric axes stay stric
 The example matches the saved symmetric (1,2) delay baseline's coefficients and
 starts in ignore mode. A comparison of independently chosen windows against that
 baseline is proposed for discussion only, not executed or evidence of superiority.
+
+
+## Optional full-trace decision gaps (output schema 4)
+
+Only `trajectories.csv.gz`, enabled by `--save-trajectories`, adds `decision_gap_a`
+and `decision_gap_b`. `episodes.csv`, `summary.csv`, and the separately seeded
+illustrative `trajectory.csv` retain their previous columns and values. Unavailable
+values are None in memory and blank in CSV. No schedules, counted pending amounts,
+or additional result columns are added. Full tracing remains off by default.
+
+GraduatedPolicy records its effective gap; SafetyGapPolicy and
+ThresholdInterventionPolicy record the effective gap compared to their thresholds.
+PendingAwareGraduatedPolicy records its anticipated gap using its independent
+lookaheads, including null and zero semantics; both null give the effective gap.
+FixedPolicy and unsupported custom policies record unavailable, not zero.
+
+The optional pure `decision_gap(observation)` method shares the exact calculation
+with each supported policy's allocation rule. The Policy interface still requires
+only choose_allocation. A custom diagnostic must be deterministic and read-only;
+a custom subclass changing its decision rule must override inherited diagnostics
+if they no longer describe its rule. No mutable last-decision state is used.
+
+`simulate(..., trace=True, trace_decision_gaps=True)` and
+`run_trials(..., trace_sink=..., trace_decision_gaps=True)` opt into the fields.
+The JSON runner opts in only for full Monte Carlo traces. Additional diagnostic
+recomputation uses the exact immutable decision observation after allocation
+validation and before investment/arrivals, without another choose_allocation call
+or random draw. Ordinary traces do not perform diagnostic recomputation.
+
+These are pre-decision policy measures, distinct from post-update physical gap and
+catastrophe hazard. They explain a policy calculation, not a risk forecast or proof
+that a different action would have prevented catastrophe. In particular, pending
+safety credit can make the decision gap zero while the effective gap is positive.
+
+Output schema 4 identifies this optional full-trace addition; metadata schema 1,
+scientific model IDs, behavior IDs, and observation IDs stay unchanged. Metadata
+places the two definitions under full_trajectories.decision_gap_definitions and
+explicitly notes that the other file schemas retain schema-3 columns. Historical
+metadata/output files are not rewritten. This is instrumentation, not a new model.
