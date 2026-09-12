@@ -150,7 +150,7 @@ def test_tiny_runner_matches_direct_calls(tmp_path,monkeypatch,a_type,b_type,mod
     pd.testing.assert_frame_equal(saved,pd.DataFrame(trajectory['history']))
     assert {'pre_capability_a','post_capability_a','allocation_a','allocation_b'} <= set(saved)
     metadata=json.loads((output/'metadata.json').read_text())
-    assert metadata['model_id']==model_id and metadata['metadata_schema_version']==1
+    assert metadata['behavior_model_id']==model_id and metadata['metadata_schema_version']==1
     assert metadata['input_config']==document and metadata['resolved_config']==runner.parse_config(document)[3]
     assert metadata['description']==document['description']
     assert metadata['experiment_name']==document['name']

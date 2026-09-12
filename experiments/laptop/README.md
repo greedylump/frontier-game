@@ -69,7 +69,7 @@ trajectory uses `seed + 1` separately and is excluded from the trial summary.
 Trace columns distinguish pre-transition state, allocations, and post-transition
 outcomes; legacy unprefixed state fields are post-transition aliases.
 
-Metadata records FG-M002/schema 1, defaults and zero initial state, policy types
+Metadata records FG-M005 with FG-M002 behavior/schema 1, defaults and zero initial state, policy types
 and parameters, exact-observation assumptions, seeds, timestamps, status, versions,
 and Git commit/dirty state (including untracked non-ignored files). A dirty commit
 alone does not identify executed source; no source snapshot is created here.
@@ -318,7 +318,8 @@ This is instrumentation, not a new mathematical model; model IDs are unchanged.
 Production delays are configured through `model.capability_delay_a`,
 `model.safety_delay_a`, `model.capability_delay_b`, and `model.safety_delay_b`.
 They default to zero and can be set or swept even when omitted from input JSON.
-Nonzero delays select FG-M004; zero-delay runs retain policy-based model IDs.
+Current runs use FG-M005 for exact pending-work observations. `behavior_model_id`
+records FG-M004 with nonzero delays, or the earlier policy-based ID with zero delays.
 Output schema 3 adds pending capability/safety amounts by lab to episodes and
 traces. See ../../docs/model.md for t+d update timing and terminal meaning.
 
@@ -327,3 +328,11 @@ Example for review only (dry-run resolves settings without simulation or output)
 ```powershell
 .\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/graduated.json --set model.capability_delay_a=1 --set model.capability_delay_b=1 --set model.safety_delay_a=2 --set model.safety_delay_b=2 --dry-run
 ```
+
+
+The observation builder exposes immutable own/opponent pending schedules and
+configured delays before decisions, including arrivals due now and beyond the
+horizon. Observation metadata describes this as `exact-pending-pre-decision-v1`.
+Existing policies ignore the added fields. Schedules are not serialized into every
+output row; pending-total columns remain post-update diagnostics. See
+[the model description](../../docs/model.md) for the full API and exclusions.

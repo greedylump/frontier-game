@@ -1,7 +1,7 @@
 # Frontier Game: project state and handoff
 
 Prepared from the research conversation and saved results through run
-`sweep-20260911T180613122294Z`, plus verified delay implementation.
+`sweep-20260911T180613122294Z`, plus the delay and pending-work observation implementations.
 Read this first when resuming, then consult `MODEL_REGISTER.md`, source, and run
 metadata. Update this file after meaningful decisions or completed experiment batches.
 
@@ -316,7 +316,7 @@ proven superior burst mechanism yet.
 
 ## Latest completed experiment: five-seed threshold comparison
 
-Saved episode files were checked across seeds 2026?2030, 1,000 histories per seed
+Saved episode files were checked across seeds 2026-2030, 1,000 histories per seed
 and 5,000 per policy. New threshold seeds are in
 `results/sweep-20260911T180613122294Z`; seed 2026 is reused from
 `results/sweep-20260911T050226158766Z`. The graduated B=10 reference is in
@@ -340,9 +340,11 @@ FG-M004 adds four independent capability/safety delays by lab, default zero.
 One production loop constructs decisions from previous effective stocks, invests
 and releases work due at t+d, then checks catastrophe. Pending queues retain
 realized amounts, arrival periods, and lab attribution, including beyond-horizon
-work. Existing policies cannot see pending amounts; only effective capability
+work. FG-M004 originally hid pending amounts; FG-M005 now exposes their schedules.
+Only effective capability
 wins the prize and only effective stocks affect risk. Catastrophe stops arrivals.
-Zero-delay runs retain policy-based model IDs and exact old fields/RNG consumption;
+At FG-M004 introduction, zero-delay runs retained policy-based model IDs.
+FG-M005 now records those as behavior_model_id, preserving old fields/RNG consumption;
 output schema 3 adds pending diagnostics consistently, so files are not claimed
 byte-identical. See model.md and MODEL_REGISTER.md for definitions and provenance.
 
@@ -353,8 +355,8 @@ Final verification: `python -m pytest -q --basetemp .pytest-tmp-delay-final`
 passed all 399 tests; `git diff --check` passed. The default temporary directory
 initially produced permission errors; repository-local temporary outputs worked.
 Two override regressions found during verification were corrected before this
-passing full-suite run. Source remains uncommitted for review; no research
-experiment was launched.
+passing full-suite run. The delay implementation was subsequently committed as
+673f6d21dec32ba2d85cfcc00049ceaa537072c9; no delay research experiment was launched.
 
 Unimplemented: incident-driven additive/replacement delays; rescheduling pending
 work; temporary/permanent restrictions and release gates; pending-aware policies;
@@ -364,3 +366,55 @@ withholding credit for pending safety.
 Proposed first delay experiment, for discussion only: hold the graduated reference
 policies fixed and compare symmetric capability/safety delay pairs (0,0), (1,1),
 (1,2), and (2,1). Do not execute without research authorization.
+
+
+## Pending-work observation extension: implemented, policy still proposed
+
+FG-M005 adds `own_pending_capability`, `opponent_pending_capability`,
+`own_pending_safety`, `opponent_pending_safety`, `own_capability_delay`,
+`opponent_capability_delay`, `own_safety_delay`, and `opponent_safety_delay` to
+immutable observations. Existing effective stock, period, and horizon fields remain.
+Schedules contain frozen `PendingArrival(amount, arrival_period)` records, sorted
+by absolute arrival period and copied independently from engine queues.
+
+Both observations precede either decision. Due-now work is pending until the update;
+beyond-horizon work remains visible. Earlier investment shocks have already realized
+the observed capability amounts. Current decisions/investment, future shocks, policy
+internals, mutable queues, and RNG state remain excluded. Empty tuples mean known
+empty schedules; omitted manual fields are None (unavailable), not zero. The simulator
+always supplies exact schedules and configured delays. There is only shared effective
+safety; pending safety retains its producing lab.
+
+The true engine state -> observation builder -> immutable observation -> policy
+boundary permits future measurement uncertainty, missing/delayed reports, strategic
+concealment/misreporting, and regulatory disclosure transformations or audit errors.
+These mechanisms remain unimplemented. Future observation randomness needs a separate
+stream; none is added now. No projection or anticipated-gap rule is imposed.
+
+Existing policies and all physical transitions/risk calculations are unchanged.
+New runner metadata describes exact visibility using exact-pending-pre-decision-v1;
+scientific model_id is FG-M005 and behavior_model_id records the earlier classification
+reproduced by current policies. Output schema remains 3, metadata schema remains 1.
+No full schedules are added to episode/trajectory files; existing pending totals are
+post-update diagnostics, distinct from policy observations. Historical files and the
+duplicate threshold-run removal note above are preserved.
+
+Implementation and verification are authorized; research runs are not. Changes remain
+uncommitted for review. The next step is choosing and implementing a policy that uses
+pending information, outside this task. Uncertain observations, cheating, regulatory
+reporting, pending-aware policies, dynamic delays/rescheduling, restrictions/release
+gates, and remediation remain unimplemented. The proposed delay comparison above
+remains for discussion only.
+
+
+Observation-extension verification: the full suite passed 513 tests with
+`python -m pytest -q --basetemp .pytest-tmp-observation-full`. After relaxing arrival
+record validation to preserve engine numerical values without extra transition
+rules, all 114 observation tests passed again with
+`python -m pytest tests/test_pending_observations.py -q --basetemp .pytest-tmp-observation-final-focused`.
+`git diff --check` passed. Exact reference checks include complete episode results,
+traces, and final RNG states for fixed, safety-gap, graduated, and threshold policies
+with zero/nonzero delays, survival/catastrophe, and tracing on/off. Timing, perspective,
+immutability, retained snapshots, known-empty/unavailable information, current-action
+exclusions, and both runners' metadata were also checked. Only temporary test outputs
+were created; no research experiments or historical output changes were made.

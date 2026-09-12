@@ -24,8 +24,8 @@ identification of affected runs, even if the intended scientific model is unchan
 | FG-M001 | Fixed-allocation, shared-safety baseline | Implemented; existing runs retrospectively classified | None | Two symmetric players, constant allocations, terminal rank prize |
 | FG-M002 | Per-period policies with exact observations | Implemented; research runs exist; not limited to small verification | FG-M001 | Immutable player observations and per-period decisions; one shared safety-gap rule |
 | FG-M003 | Graduated relative-position and safety response | Implemented; research runs exist; not limited to small verification | FG-M002 | Adds a prescribed continuous allocation rule responding to capability deficit and shared gap |
-
 | FG-M004 | Delayed capability and shared-safety production | Implemented; verification only, no research runs authorized | FG-M003 | Lab-specific investment-to-effect delays and unfinished production |
+| FG-M005 | Exact pending-work observations | Implemented; verification only | FG-M004 | Exposes realized pending schedules and configured delays through immutable observations |
 
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
@@ -276,3 +276,47 @@ fields are preserved exactly for zero delays, including RNG state, as checked
 against Git revision f9774c1796c37a714379270828a8f604da567609 in test infrastructure.
 Metadata schema stays 1; full Monte Carlo trajectories remain optional and disabled
 by default. Historical schema-2 documentation above describes earlier outputs.
+
+
+## FG-M005: exact pending-work observations
+
+Purpose: expose already-scheduled capability and safety production to policies,
+through an observation boundary separate from transitions. Parent: FG-M004.
+Changed assumption: the allowed information now includes both labs' exact realized
+pending schedules and configured capability/safety delays, oriented as own/opponent.
+This warrants a new scientific ID even though every existing policy ignores the
+new fields and retains identical results and random-number consumption.
+
+Observations are constructed simultaneously before decisions, investment, and
+arrivals. Work due this period is pending, not effective; beyond-horizon work is
+included. Frozen `PendingArrival(amount, arrival_period)` records form sorted tuple
+snapshots. Manual omitted fields mean unavailable (`None`); known-empty schedules
+are `()`. The simulator supplies exact schedules and known delays, including zero.
+No separate opponent effective safety stock exists. See [model.md](model.md) for
+all field names, exclusions, and the boundary for future imperfect information.
+
+Retained: all FG-M004 physical transitions, investment-time productivity shocks,
+effective-stock risk and terminal payoff rules, original policy implementations,
+trace fields, and pending-total diagnostics. Pending-aware policies, uncertainty,
+cheating/concealment, regulatory reporting, and observation noise remain unimplemented.
+No research experiment is authorized or executed for this extension.
+
+Current JSON individual runs and sweep entries, and the safety-gap runner, record
+`model_id=FG-M005` with `observation.model_id=exact-pending-pre-decision-v1`.
+`behavior_model_id` preserves the earlier interpretation for existing rules:
+FG-M004 for nonzero delays; otherwise FG-M003 for graduated/threshold, FG-M002 for
+safety-gap, or FG-M001 for fixed policies. This comparison label is not a claim
+that the expanded information existed historically. Earlier sections describe
+historical classifications; historical outputs and metadata are not rewritten.
+The richer observation interface is present even in zero-delay runs.
+
+Metadata schema remains 1 (additive description fields); output schema remains 3.
+Policy schedules are not automatically serialized into episode or trajectory files.
+Post-update pending totals remain diagnostics, distinct from pre-decision information.
+
+Implementation revision: current uncommitted extension, based on delay-engine Git
+673f6d21dec32ba2d85cfcc00049ceaa537072c9. No new commit claimed.
+Associated research run IDs: none; only temporary verification outputs. Test-only
+frozen source from that revision provides exact comparisons of complete episode
+results, traces, and final RNG states with zero and nonzero delays for all four
+existing policy families, including trace-on/off and catastrophe cases.

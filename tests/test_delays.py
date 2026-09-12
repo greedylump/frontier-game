@@ -117,11 +117,15 @@ def test_runner_delay_sweep_and_metadata(tmp_path):
                  '--set', 'model.safety_delay_a=0', '--set', 'model.capability_delay_b=0', '--set', 'model.safety_delay_b=0'])
     manifest = json.loads((output/'manifest.json').read_text())
     assert manifest['output_schema_version'] == 3
-    assert [e['model_id'] for e in manifest['experiments']] == ['FG-M003', 'FG-M004']
+    assert manifest['observation']['pending_work_visible']
+    assert all(e['model_id'] == 'FG-M005' for e in manifest['experiments'])
+    assert [e['behavior_model_id'] for e in manifest['experiments']] == ['FG-M003', 'FG-M004']
     for entry in manifest['experiments']:
         folder = output/entry['output_path']
         meta = json.loads((folder/'metadata.json').read_text())
-        assert meta['model_id'] == entry['model_id']
+        assert meta['model_id'] == entry['model_id'] == 'FG-M005'
+        assert meta['observation'] == manifest['observation']
+        assert meta['behavior_model_id'] == entry['behavior_model_id']
         assert meta['resolved_config'] == entry['resolved_config']
         assert meta['output_schema_version'] == 3
         assert all(k in meta['diagnostics']['definitions'] for k in PENDING)
@@ -133,9 +137,9 @@ def test_runner_delay_sweep_and_metadata(tmp_path):
     (SafetyGapPolicy(), FixedPolicy(.5), 'FG-M002'),
     (ThresholdInterventionPolicy(), FixedPolicy(.5), 'FG-M003')])
 def test_classification(a, b, expected):
-    assert runner.model_id_for(a, b, Config()) == expected
+    assert runner.behavior_model_id_for(a, b, Config()) == expected
     for name in DELAYS:
-        assert runner.model_id_for(a, b, Config(**{name:1})) == 'FG-M004'
+        assert runner.behavior_model_id_for(a, b, Config(**{name:1})) == 'FG-M004'
 
 
 @pytest.mark.parametrize('name', DELAYS)

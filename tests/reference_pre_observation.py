@@ -1,6 +1,6 @@
+# Test-only frozen reference from Git 673f6d21dec32ba2d85cfcc00049ceaa537072c9.
 """A finite-horizon game with simultaneous per-period allocations and shared safety."""
-from dataclasses import dataclass, asdict, fields
-from collections.abc import Mapping
+from dataclasses import dataclass, asdict
 import math
 from numbers import Real
 from typing import Protocol
@@ -54,57 +54,13 @@ class Config:
 
 
 @dataclass(frozen=True, slots=True)
-class PendingArrival:
-    """Realized production scheduled for an absolute, 1-based arrival period."""
-    amount: float
-    arrival_period: int
-
-    def __post_init__(self):
-        if isinstance(self.amount, (bool, np.bool_)) or not isinstance(self.amount, Real):
-            raise TypeError('arrival amount must be a real number')
-        if type(self.arrival_period) is not int or self.arrival_period < 1:
-            raise ValueError('arrival_period must be a positive integer')
-        # Copy the realized engine value without adding numerical transition rules.
-        object.__setattr__(self, 'amount', float(self.amount))
-
-
-@dataclass(frozen=True, slots=True)
 class Observation:
-    """Pre-decision snapshot; omitted schedules/delays mean unavailable, not zero.
-
-    Empty tuples mean known empty schedules. The simulator supplies every field.
-    Five-argument construction remains supported for stock-only policy callers.
-    """
+    """Exact pre-transition values; period is 1-based, from 1 through horizon."""
     period: int
     horizon: int
     own_capability: float
     opponent_capability: float
     shared_safety: float
-    own_pending_capability: tuple[PendingArrival, ...] | None = None
-    opponent_pending_capability: tuple[PendingArrival, ...] | None = None
-    own_pending_safety: tuple[PendingArrival, ...] | None = None
-    opponent_pending_safety: tuple[PendingArrival, ...] | None = None
-    own_capability_delay: int | None = None
-    opponent_capability_delay: int | None = None
-    own_safety_delay: int | None = None
-    opponent_safety_delay: int | None = None
-
-    def __post_init__(self):
-        # Also isolate schedules supplied manually as lists; never retain a container
-        # that its caller can mutate. No projection or horizon filtering occurs.
-        for name in ('own_pending_capability', 'opponent_pending_capability',
-                     'own_pending_safety', 'opponent_pending_safety'):
-            schedule = getattr(self, name)
-            if schedule is not None:
-                schedule = tuple(schedule)
-                if any(not isinstance(item, PendingArrival) for item in schedule):
-                    raise TypeError(f'{name} must contain PendingArrival records')
-                object.__setattr__(self, name, tuple(sorted(schedule, key=lambda item: item.arrival_period)))
-        for name in ('own_capability_delay', 'opponent_capability_delay',
-                     'own_safety_delay', 'opponent_safety_delay'):
-            delay = getattr(self, name)
-            if delay is not None and (type(delay) is not int or delay < 0):
-                raise ValueError(f'{name} must be a nonnegative integer or None')
 
 
 class Policy(Protocol):
@@ -116,60 +72,10 @@ class Policy(Protocol):
 
 
 def make_observations(period: int, horizon: int, capability_a: float,
-                      capability_b: float, safety: float, *,
-                      pending_capability: tuple[Mapping[int, float], Mapping[int, float]] | None = None,
-                      pending_safety: tuple[Mapping[int, float], Mapping[int, float]] | None = None,
-                      config: Config | None = None) -> tuple[Observation, Observation]:
-    """Copy true engine state into both player views before either decision.
-
-    Current perfect information includes due-now and beyond-horizon work. Omitted
-    inputs remain unavailable for legacy callers. Simulation always supplies them.
-    Future reporting rules belong here, separately from physical transitions;
-    stochastic observations should use a separate RNG stream.
-    """
-    def snapshot(queues, lab):
-        if queues is None:
-            return None
-        return tuple(PendingArrival(float(amount), arrival)
-                     for arrival, amount in sorted(queues[lab].items()))
-
-    def view(lab):
-        other = 1 - lab
-        own, opponent = ('a', 'b') if lab == 0 else ('b', 'a')
-        def delay(side, kind):
-            return None if config is None else getattr(config, f'{kind}_delay_{side}')
-        return Observation(period, horizon, (capability_a, capability_b)[lab],
-                           (capability_a, capability_b)[other], safety,
-                           own_pending_capability=snapshot(pending_capability, lab),
-                           opponent_pending_capability=snapshot(pending_capability, other),
-                           own_pending_safety=snapshot(pending_safety, lab),
-                           opponent_pending_safety=snapshot(pending_safety, other),
-                           own_capability_delay=delay(own, 'capability'),
-                           opponent_capability_delay=delay(opponent, 'capability'),
-                           own_safety_delay=delay(own, 'safety'),
-                           opponent_safety_delay=delay(opponent, 'safety'))
-    return view(0), view(1)
-
-
-def observation_metadata() -> dict:
-    """Description shared by runners; no schedules are serialized into results."""
-    return dict(model_id='exact-pending-pre-decision-v1', exact=True, delay_periods=0,
-                fields=[field.name for field in fields(Observation)],
-                period_indexing='1 through horizon, inclusive', simultaneous=True,
-                stocks_at='end of previous completed period', pending_work_visible=True,
-                configured_delays_visible=True,
-                schedule=dict(record_fields=['amount', 'arrival_period'],
-                    ordering='absolute arrival period ascending',
-                    timing='Before both decisions and current investment/arrivals; due-now work is pending.',
-                    amounts='Exact realized production from earlier investments; safety attributed to producing lab.',
-                    beyond_horizon_visible=True, empty='Known no pending work',
-                    unavailable=None, simulator_information='All schedules and configured delays are known.'),
-                current_opponent_action_visible=False, current_investment_visible=False,
-                future_shocks_visible=False, policy_internals_visible=False,
-                mutable_queues_visible=False, rng_state_visible=False,
-                fixed_policies_ignore_observations=True,
-                existing_policies_ignore_pending_and_delays=True,
-                diagnostics='Output pending totals are post-update diagnostics, not pre-decision schedules; schedules are not serialized.')
+                      capability_b: float, safety: float) -> tuple[Observation, Observation]:
+    """Build both player views before either policy is evaluated."""
+    return (Observation(period, horizon, capability_a, capability_b, safety),
+            Observation(period, horizon, capability_b, capability_a, safety))
 
 
 def validate_allocation(value: float) -> float:
@@ -327,9 +233,7 @@ def simulate(config: Config, policy_a: Policy, policy_b: Policy,
 
     for step in range(1, config.horizon + 1):
         observations = make_observations(step, config.horizon,
-                                          float(capability[0]), float(capability[1]), safety,
-                                          pending_capability=tuple(pending_capability),
-                                          pending_safety=tuple(pending_safety), config=config)
+                                          float(capability[0]), float(capability[1]), safety)
         chosen_a = policy_a.choose_allocation(observations[0])
         chosen_b = policy_b.choose_allocation(observations[1])
         allocation = np.array([validate_allocation(chosen_a), validate_allocation(chosen_b)])

@@ -1,4 +1,4 @@
-﻿"""Manual FG-M002 experiment: two identical, immutable safety-gap rules."""
+﻿"""Manual safety-gap experiment (FG-M005; FG-M002 behavior): two identical, immutable safety-gap rules."""
 import argparse
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -13,6 +13,8 @@ from time import perf_counter, sleep
 import numpy as np
 import pandas as pd
 from frontier_game import Config, SafetyGapPolicy, run_trials, simulate, summarize
+
+from frontier_game.model import observation_metadata
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 
@@ -73,16 +75,13 @@ def main(argv=None):
     output = args.output or Path('results') / datetime.now(timezone.utc).strftime('safety-gap-%Y%m%dT%H%M%S%fZ')
     provenance = code_provenance()
     output.mkdir(parents=True, exist_ok=False)
-    metadata = dict(model_id='FG-M002', metadata_schema_version=1, run_id=output.name,
+    metadata = dict(model_id='FG-M005', behavior_model_id='FG-M002', metadata_schema_version=1, run_id=output.name,
                     description='Two identical safety-gap rules with exact pre-transition observations',
                     category=args.category, config=asdict(config),
                     initial_state=dict(capability_a=0.0, capability_b=0.0, shared_safety=0.0),
                     policies={name: dict(type=type(policy).__name__, parameters=asdict(policy))
                               for name, policy in [('a', policy_a), ('b', policy_b)]},
-                    observation=dict(model_id='exact-pre-transition-v1', exact=True, delay_periods=0,
-                                     period_indexing='1 through horizon, inclusive',
-                                     fields=['period', 'horizon', 'own_capability', 'opponent_capability', 'shared_safety'],
-                                     simultaneous=True, current_opponent_action_visible=False),
+                    observation=observation_metadata(),
                     seed=args.seed, trials=args.trials, completed_trials=0,
                     trial_seed_rule='numpy SeedSequence(seed).spawn(trials)',
                     trajectory_seed=args.seed+1, trajectory_in_summary=False,

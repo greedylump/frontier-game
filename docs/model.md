@@ -9,7 +9,8 @@ uses fixed allocations; FG-M002 also permits per-period observation-based rules.
 
 At the start of every period (indexed 1 through H), construct both exact,
 immutable player observations from the same pre-transition state: own capability,
-opponent capability, and shared safety, plus period and horizon. Then call both
+opponent capability, shared safety, pending schedules and configured delays
+(see FG-M005 below), plus period and horizon. Then call both
 policies and validate both allocations as finite real numbers in [0,1]. Fixed
 policies are called too and simply return their constant. Observation construction
 is separate from evaluation; neither choice can observe the other current action.
@@ -37,7 +38,7 @@ The all-restraint policy even earns a shared prize at zero capability. This is a
 intentional simplifying consequence of the terminal relative-rank payoff; consider
 a deployment threshold or absolute output benefit in a later experiment.
 There are no budgets beyond allocation, private information, enforcement, learning,
-spillovers in capability, or endogenous entry. Effective stocks are observed exactly; pending work is excluded from policy observations.
+spillovers in capability, or endogenous entry. Effective stocks are observed exactly; pending schedules and configured delays are also observed exactly.
 Fixed policies ignore observations. Risk is zero when capability does not exceed safety.
 These choices can determine findings: vary them before drawing broad conclusions.
 
@@ -61,13 +62,14 @@ IDs, retained FG-M001 interpretation, and provenance limitations.
 
 `capability_delay_a`, `safety_delay_a`, `capability_delay_b`, and `safety_delay_b`
 default to zero. Each accepts a nonnegative integer, rejecting booleans, fractions,
-and negatives. A nonzero value classifies the run as FG-M004; all-zero runs retain
-their policy-based FG-M001/FG-M002/FG-M003 classification.
+and negatives. These transition rules were introduced as FG-M004. Current runs
+use FG-M005 for the expanded information interface; their `behavior_model_id`
+records FG-M004 with delays, or FG-M001/FG-M002/FG-M003 without delays.
 
 Work invested in period t with delay d becomes effective during the update of
 period t+d, before its catastrophe check. Both observations and validated decisions
 come first, using effective stocks at the end of the previous completed period.
-Arrivals due now are therefore invisible to current decisions. For delay 1,
+Arrivals due now are visible as pending schedules, but not as effective stocks. For delay 1,
 one unit of capability invested each period gives post-update stocks [0,1,2]
 in a three-period deterministic episode.
 
@@ -102,3 +104,57 @@ Dynamic incident-driven additive/replacement delays, rescheduling pending work,
 temporary/permanent restrictions and release gates, pending-aware policies,
 recoverable incidents/remediation, and counting pending capability as risk while
 withholding credit for pending safety are all unimplemented.
+
+
+## Pending-work observations (FG-M005)
+
+The observation boundary is true engine state -> `make_observations` -> immutable
+`Observation` -> policy. The builder copies both views before either decision;
+it neither advances queues nor consumes randomness. Existing policies are unchanged
+and ignore the added information. The delay engine and actual gap/hazard calculation
+remain unchanged: only effective capability and effective shared safety enter risk.
+
+The public API exports `PendingArrival(amount, arrival_period)`, a frozen record
+of realized production and absolute 1-based arrival period. `Observation` retains
+`period`, `horizon`, `own_capability`, `opponent_capability`, and `shared_safety`,
+and adds:
+
+- `own_pending_capability`, `opponent_pending_capability`;
+- `own_pending_safety`, `opponent_pending_safety`;
+- `own_capability_delay`, `opponent_capability_delay`;
+- `own_safety_delay`, `opponent_safety_delay`.
+
+Schedules are immutable tuples sorted by arrival period, aggregating work by lab,
+work type, and arrival period in the engine. Snapshots are independent of mutable
+queues. Safety schedules retain the producing lab; no opponent effective safety
+stock or historical attribution of effective safety is constructed.
+
+At the start of t, schedules include work due at t and beyond the horizon. Work
+created by either current decision is absent. Capability amounts are exact realized
+production from earlier investment shocks, an explicit perfect-information assumption.
+Neither current opponent actions, future shocks, policy internals, mutable queues,
+nor RNG state are exposed. Configured delays describe new investments; arrival
+records describe work already scheduled. No anticipated gap, projection, lookahead
+horizon, or next-period filter is imposed by the builder.
+
+Five-argument `Observation(...)` and stock-only `make_observations(...)` calls still
+work: added fields default to `None`, meaning unavailable. `()` means known empty,
+and delay 0 means known immediate production. The simulator always supplies all
+exact schedules and delays. Manual schedule lists are copied into immutable tuples.
+A known-empty observation therefore differs from an otherwise equal stock-only one.
+
+Future measurement uncertainty, missing data, delayed reports, competitor concealment
+or misreporting, and regulatory restrictions/reporting transformations/audit errors
+belong at the observation boundary. They are unimplemented. Stochastic observation
+rules must use a separate random stream to avoid changing physical productivity
+and catastrophe draws. No unused observation RNG, registry, or reporting actions
+are introduced. Policies using pending work are the next design step, outside this
+implementation; no pending-aware or forward-looking policy is implemented.
+
+Runner observation metadata uses `exact-pending-pre-decision-v1` and lists fields,
+timing, visibility, and exclusions. New JSON run/sweep and safety-gap runner metadata
+uses scientific ID FG-M005, plus `behavior_model_id` for the earlier classification
+reproduced by existing policies. Metadata schema 1 and output schema 3 are retained:
+no episode or trajectory columns change and schedules are not serialized by default.
+Existing pending-total diagnostics measure post-update unfinished work, whereas
+policy schedules are pre-decision snapshots. Historical outputs/metadata are untouched.

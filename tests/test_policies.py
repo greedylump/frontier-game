@@ -17,6 +17,11 @@ entry = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(entry)
 
 
+def stock_view(observation):
+    return Observation(observation.period, observation.horizon, observation.own_capability,
+                       observation.opponent_capability, observation.shared_safety)
+
+
 class RecordingPolicy:
     def __init__(self, allocation):
         self.allocation = allocation
@@ -47,9 +52,9 @@ def test_observations_are_immutable_oriented_pretransition_views():
     a, b = RecordingPolicy(.8), RecordingPolicy(.2)
     result = simulate(Config(horizon=3, noise=0, hazard_scale=0), a, b, np.random.default_rng(4), trace=True)
     assert len(a.observations) == len(b.observations) == 3
-    assert a.observations[0] == b.observations[0] == Observation(1, 3, 0., 0., 0.)
-    assert a.observations[1] == Observation(2, 3, .8, .2, .6)
-    assert b.observations[1] == Observation(2, 3, .2, .8, .6)
+    assert stock_view(a.observations[0]) == stock_view(b.observations[0]) == Observation(1, 3, 0., 0., 0.)
+    assert stock_view(a.observations[1]) == Observation(2, 3, .8, .2, .6)
+    assert stock_view(b.observations[1]) == Observation(2, 3, .2, .8, .6)
     with pytest.raises(FrozenInstanceError):
         a.observations[0].shared_safety = 99
     assert not hasattr(a.observations[0], '__dict__')
@@ -68,8 +73,8 @@ def test_both_views_are_built_before_first_policy_evaluation(monkeypatch):
     import frontier_game.model as model
     events = []
     original = model.make_observations
-    def observe(*args):
-        pair = original(*args)
+    def observe(*args, **kwargs):
+        pair = original(*args, **kwargs)
         events.append('both views built')
         return pair
     class Policy:
@@ -125,7 +130,7 @@ def test_identical_relative_rules_can_choose_different_actions():
     assert result['history'][1]['allocation_a'] != result['history'][1]['allocation_b']
 
 
-def test_delayed_arrivals_are_not_visible_to_current_observations():
+def test_delayed_arrivals_are_not_effective_in_current_observations():
     class ProbePolicy:
         def __init__(self):
             self.observations = []
@@ -142,10 +147,10 @@ def test_delayed_arrivals_are_not_visible_to_current_observations():
     result = simulate(cfg, a, b, np.random.default_rng(1), trace=True)
     assert result["capability_a"] == result["capability_b"] == .5
     assert result["safety"] == .2
-    assert a.observations[0] == Observation(1, 2, 0.0, 0.0, 0.0)
-    assert a.observations[1] == Observation(2, 2, 0.0, 0.0, 0.0)
-    assert b.observations[0] == Observation(1, 2, 0.0, 0.0, 0.0)
-    assert b.observations[1] == Observation(2, 2, 0.0, 0.0, 0.0)
+    assert stock_view(a.observations[0]) == Observation(1, 2, 0.0, 0.0, 0.0)
+    assert stock_view(a.observations[1]) == Observation(2, 2, 0.0, 0.0, 0.0)
+    assert stock_view(b.observations[0]) == Observation(1, 2, 0.0, 0.0, 0.0)
+    assert stock_view(b.observations[1]) == Observation(2, 2, 0.0, 0.0, 0.0)
 
 
 @pytest.mark.parametrize('bad', [-.1, 1.1, float('nan'), float('inf'), '0.5', None, True, 1j])
@@ -157,7 +162,7 @@ def test_invalid_output_rejected_before_transition_or_random_draw(bad, side):
     with pytest.raises(ValueError, match='allocation'):
         simulate(Config(), a, b, rng)
     assert rng.bit_generator.state == before
-    assert a.observations == b.observations == [Observation(1, 30, 0., 0., 0.)]
+    assert [stock_view(o) for o in a.observations] == [stock_view(o) for o in b.observations] == [Observation(1, 30, 0., 0., 0.)]
 
 
 @pytest.mark.parametrize('kwargs', [dict(normal_allocation=-.1), dict(cautious_allocation=1.1),
@@ -203,7 +208,7 @@ def test_entry_point_tiny_run_and_overwrite_refusal(tmp_path, monkeypatch):
     entry.main(args)
     assert {p.name for p in output.iterdir()} == {'episodes.csv','summary.csv','metadata.json','trajectory.csv'}
     metadata=json.loads((output/'metadata.json').read_text())
-    assert metadata['model_id'] == 'FG-M002' and metadata['metadata_schema_version'] == 1
+    assert metadata['behavior_model_id'] == 'FG-M002' and metadata['metadata_schema_version'] == 1
     assert metadata['status'] == 'complete' and metadata['completed_trials'] == metadata['trials'] == 2
     assert metadata['seed'] == 17 and metadata['trajectory_seed'] == 18 and not metadata['trajectory_in_summary']
     assert metadata['started_utc'] <= metadata['ended_utc']

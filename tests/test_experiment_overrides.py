@@ -108,7 +108,7 @@ def test_tiny_override_run_preserves_source_and_metadata(tmp_path):
     metadata=json.loads((output/'metadata.json').read_text())
     assert metadata['input_config']==original and metadata['overrides']==records
     assert metadata['resolved_config']==resolved
-    assert metadata['model_id']=='FG-M003' and metadata['status']=='complete'
+    assert metadata['behavior_model_id']=='FG-M003' and metadata['status']=='complete'
     assert metadata['seed']==17 and metadata['trials']==2 and metadata['trajectory_seed']==18
     assert metadata['seed_mapping']['episodes']==dict(entropy=17,spawn_keys=[[0],[1]])
     assert metadata['policies']['a']['parameters']['deficit_response']==0

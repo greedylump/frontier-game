@@ -19,7 +19,7 @@ from time import perf_counter, sleep
 
 import numpy as np
 import pandas as pd
-from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION
+from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION, observation_metadata
 from frontier_game import (Config, FixedPolicy, GraduatedPolicy, SafetyGapPolicy,
                             ThresholdInterventionPolicy, run_trials, simulate, summarize)
 
@@ -36,6 +36,12 @@ POLICY_TYPES = {'fixed': FixedPolicy,
 
 
 def model_id_for(policy_a, policy_b, config=None):
+    """Current allowed information is FG-M005 even when existing rules ignore it."""
+    return 'FG-M005'
+
+
+def behavior_model_id_for(policy_a, policy_b, config=None):
+    """Earlier scientific interpretation reproduced by the existing policy rules."""
     if config is not None and any(getattr(config, name, 0) != 0 for name in (
             'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b')):
         return 'FG-M004'
@@ -162,6 +168,7 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
     config, policy_a, policy_b, resolved = prepared
     seed, trials = resolved['seed'], resolved['trials']
     metadata = dict(model_id=model_id_for(policy_a, policy_b, config=config),
+                    behavior_model_id=behavior_model_id_for(policy_a, policy_b, config=config),
                     metadata_schema_version=1, output_schema_version=OUTPUT_SCHEMA_VERSION, run_id=output.name,
                     diagnostics=dict(definitions=DIAGNOSTIC_DEFINITIONS,
                         periods='Executed periods only, including terminal catastrophe.'),
@@ -175,12 +182,7 @@ def execute_experiment(source, document, input_path, overrides, prepared, output
                     config=asdict(config), initial_state=dict(capability_a=0.0, capability_b=0.0, shared_safety=0.0),
                     policies={side: dict(type=type(policy).__name__, identifier=resolved['policies'][side]['type'],
                                          parameters=asdict(policy)) for side, policy in [('a', policy_a), ('b', policy_b)]},
-                    observation=dict(model_id='exact-pre-transition-v1', exact=True, delay_periods=0,
-                                     period_indexing='1 through horizon, inclusive',
-                                     fields=['period', 'horizon', 'own_capability', 'opponent_capability', 'shared_safety'],
-                                     simultaneous=True, current_opponent_action_visible=False,
-                                     pending_work_visible=False, stocks_at="end of previous completed period",
-                                     fixed_policies_ignore_observations=True),
+                    observation=observation_metadata(),
                     seed=seed, trials=trials, completed_trials=0,
                     trial_seed_rule='numpy SeedSequence(seed).spawn(trials)', trajectory_seed=seed+1,
                     seed_mapping=dict(episodes=dict(entropy=seed, spawn_keys=[[i] for i in range(trials)]),
@@ -318,7 +320,7 @@ def save_manifest(output, manifest):
 
 def execute_sweep(source, document, args, plans, csv_source, command, provenance):
     output = args.output or Path('results') / datetime.now(timezone.utc).strftime('sweep-%Y%m%dT%H%M%S%fZ')
-    manifest = dict(output_schema_version=OUTPUT_SCHEMA_VERSION, save_trajectories=args.save_trajectories,
+    manifest = dict(observation=observation_metadata(), output_schema_version=OUTPUT_SCHEMA_VERSION, save_trajectories=args.save_trajectories,
                     input_config=document, input_config_path=str(args.config.resolve()),
                     sweep_specification=dict(set=args.overrides, sweep=args.sweep,
                         sweep_csv=str(args.sweep_csv.resolve()) if args.sweep_csv else None,
@@ -330,7 +332,8 @@ def execute_sweep(source, document, args, plans, csv_source, command, provenance
                     experiments=[dict(experiment_id=i, output_path=f'{i:04d}', status='pending',
                         varied_parameters=plan['varied_parameters'], overrides=plan['overrides'],
                         resolved_config=plan['prepared'][3], seed=plan['prepared'][3]['seed'],
-                        model_id=model_id_for(plan['prepared'][1], plan['prepared'][2], config=plan['prepared'][0]))
+                        model_id=model_id_for(plan['prepared'][1], plan['prepared'][2], config=plan['prepared'][0]),
+                        behavior_model_id=behavior_model_id_for(plan['prepared'][1], plan['prepared'][2], config=plan['prepared'][0]))
                         for i, plan in enumerate(plans, 1)], **provenance)
     output.mkdir(parents=True, exist_ok=False)
     save_manifest(output, manifest)

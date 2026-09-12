@@ -61,7 +61,7 @@ def test_example_loading_only():
     assert a == b == GraduatedPolicy(.6,.1,.2) and a is not b
     assert config.horizon==30 and config.noise==.25
     assert resolved['trials']==1000 and resolved['seed']==2026
-    assert runner.model_id_for(a,b)=='FG-M003'
+    assert runner.behavior_model_id_for(a,b)=='FG-M003'
     for side in ('a','b'):
         assert resolved['policies'][side] == dict(type='graduated',parameters=asdict(a))
     document['policies']['a']['parameters']={}
@@ -77,9 +77,9 @@ def test_independent_mixed_configuration(side,other_type,parameters):
     _,a,b,_=runner.parse_config(document)
     assert isinstance(a if side=='a' else b,GraduatedPolicy)
     assert not isinstance(b if side=='a' else a,GraduatedPolicy)
-    assert runner.model_id_for(a,b)=='FG-M003'
-    assert runner.model_id_for(FixedPolicy(.4),FixedPolicy(.6))=='FG-M001'
-    assert runner.model_id_for(SafetyGapPolicy(),FixedPolicy(.4))=='FG-M002'
+    assert runner.behavior_model_id_for(a,b)=='FG-M003'
+    assert runner.behavior_model_id_for(FixedPolicy(.4),FixedPolicy(.6))=='FG-M001'
+    assert runner.behavior_model_id_for(SafetyGapPolicy(),FixedPolicy(.4))=='FG-M002'
 
 
 def test_config_rejects_typo_and_invalid_response():
@@ -105,7 +105,7 @@ def test_tiny_runner_metadata_and_direct_equivalence(tmp_path):
     expected=run_trials(config,a,b,trials=2,seed=document['seed'])
     pd.testing.assert_frame_equal(pd.read_csv(output/'episodes.csv'),expected)
     metadata=json.loads((output/'metadata.json').read_text())
-    assert metadata['model_id']=='FG-M003' and metadata['status']=='complete'
+    assert metadata['behavior_model_id']=='FG-M003' and metadata['status']=='complete'
     assert metadata['policies']['a']['type']=='GraduatedPolicy'
     assert metadata['policies']['b']['parameters']==asdict(b)
     trajectory=pd.read_csv(output/'trajectory.csv')

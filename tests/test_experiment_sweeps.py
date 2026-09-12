@@ -136,7 +136,7 @@ def test_sweep_outputs_and_quiet_equivalence(source,tmp_path,capsys):
             assert entry['status']=='complete' and entry['output_path']==f'{i:04d}' and entry['seed']==2026
             sub=output/entry['output_path']
             meta=json.loads((sub/'metadata.json').read_text())
-            assert meta['input_config']==document() and meta['model_id']=='FG-M003'
+            assert meta['input_config']==document() and meta['behavior_model_id']=='FG-M003'
             effective,_=runner.apply_overrides(document(),[f'{PATH}={entry["varied_parameters"][PATH]}'])
             config,a,b,_=runner.parse_config(effective)
             pd.testing.assert_frame_equal(pd.read_csv(sub/'episodes.csv'),run_trials(config,a,b,trials=2,seed=2026))
