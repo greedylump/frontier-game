@@ -1,6 +1,6 @@
 """A finite-horizon game with simultaneous per-period allocations and shared safety."""
 from dataclasses import dataclass, asdict, fields
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import math
 from numbers import Real
 from typing import Protocol
@@ -298,6 +298,64 @@ class PendingAwareGraduatedPolicy(GraduatedPolicy):
         allocation = (self.base_allocation + self.deficit_response * deficit
                       - self.safety_response * anticipated_gap)
         return float(np.clip(allocation, 0.0, 1.0))
+
+
+@dataclass(frozen=True)
+class PendingWeightedGraduatedPolicy(GraduatedPolicy):
+    """Arrival-offset safety credit, without changing physical safety.
+
+    Per-lab sums preserve unit-window arithmetic. Weights need not sum to one;
+    no horizon cap is applied. Empty/all-zero weights ignore safety schedules.
+    """
+    capability_lookahead: int | None = None
+    safety_weights: tuple[float, ...] = ()
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.capability_lookahead is not None and (
+                type(self.capability_lookahead) is not int or self.capability_lookahead < 0):
+            raise ValueError('capability_lookahead must be a nonnegative integer or None')
+        if isinstance(self.safety_weights, (str, bytes)) or not isinstance(self.safety_weights, Sequence):
+            raise ValueError('safety_weights must be a sequence of finite numbers in [0, 1]')
+        normalized = []
+        for weight in self.safety_weights:
+            try:
+                normalized.append(validate_allocation(weight))
+            except ValueError as error:
+                raise ValueError('safety_weights entries must be finite numbers in [0, 1], not booleans') from error
+        object.__setattr__(self, 'safety_weights', tuple(normalized))
+
+    def decision_gap(self, observation: Observation) -> float:
+        credit_safety = any(self.safety_weights)
+        if self.capability_lookahead is None and not credit_safety:
+            return super().decision_gap(observation)
+
+        def capability(name):
+            if self.capability_lookahead is None:
+                return 0.0
+            schedule = getattr(observation, name)
+            if schedule is None:
+                raise ValueError(f'{name} is unavailable but capability_lookahead is enabled')
+            return sum((item.amount for item in schedule
+                        if observation.period <= item.arrival_period <= observation.period + self.capability_lookahead), 0.0)
+
+        def safety(name):
+            if not credit_safety:
+                return 0.0
+            schedule = getattr(observation, name)
+            if schedule is None:
+                raise ValueError(f'{name} is unavailable but safety_weights contains positive credit')
+            return sum((self.safety_weights[offset] * item.amount
+                        for item in schedule
+                        if 0 <= (offset := item.arrival_period - observation.period) < len(self.safety_weights)
+                        and self.safety_weights[offset] > 0), 0.0)
+
+        own = capability('own_pending_capability')
+        opponent = capability('opponent_pending_capability')
+        pending_safety = safety('own_pending_safety') + safety('opponent_pending_safety')
+        return max(0.0, max(observation.own_capability + own,
+                            observation.opponent_capability + opponent)
+                   - (observation.shared_safety + pending_safety))
 
 
 @dataclass(frozen=True)

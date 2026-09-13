@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from frontier_game.model import DIAGNOSTIC_DEFINITIONS, OUTPUT_SCHEMA_VERSION, FULL_TRACE_DIAGNOSTIC_DEFINITIONS, observation_metadata
 from frontier_game import (Config, FixedPolicy, GraduatedPolicy, PendingAwareGraduatedPolicy, SafetyGapPolicy,
-                            ThresholdInterventionPolicy, run_trials, simulate, summarize)
+                            PendingWeightedGraduatedPolicy, ThresholdInterventionPolicy, run_trials, simulate, summarize)
 
 # Support both direct script execution and package imports in tests.
 if __package__:
@@ -33,11 +33,14 @@ POLICY_TYPES = {'fixed': FixedPolicy,
                 'safety_gap': SafetyGapPolicy,
                 'graduated': GraduatedPolicy,
                 'pending_aware_graduated': PendingAwareGraduatedPolicy,
+                'pending_weighted_graduated': PendingWeightedGraduatedPolicy,
                 'threshold_intervention': ThresholdInterventionPolicy}
 
 
 def model_id_for(policy_a, policy_b, config=None):
-    """New policy family is FG-M006; previous policies retain FG-M005."""
+    """Preserve previous family IDs; weighted policy is FG-M007."""
+    if any(isinstance(p, PendingWeightedGraduatedPolicy) for p in (policy_a, policy_b)):
+        return 'FG-M007'
     if any(isinstance(p, PendingAwareGraduatedPolicy) for p in (policy_a, policy_b)):
         return 'FG-M006'
     return 'FG-M005'
@@ -45,6 +48,10 @@ def model_id_for(policy_a, policy_b, config=None):
 
 def behavior_model_id_for(policy_a, policy_b, config=None):
     """Earlier scientific interpretation reproduced by the existing policy rules."""
+    if any(isinstance(p, PendingWeightedGraduatedPolicy) and
+           (p.capability_lookahead is not None or any(p.safety_weights))
+           for p in (policy_a, policy_b)):
+        return 'FG-M007'
     if any(isinstance(p, PendingAwareGraduatedPolicy) and
            (p.capability_lookahead is not None or p.safety_lookahead is not None)
            for p in (policy_a, policy_b)):
@@ -75,6 +82,13 @@ def construct_parameters(cls, parameters, location):
     required = [f.name for f in definitions if f.default is MISSING and f.default_factory is MISSING]
     check_keys(parameters, [f.name for f in definitions], required, location)
     for name, value in parameters.items():
+        if cls is PendingWeightedGraduatedPolicy:
+            if name == 'safety_weights':
+                if not isinstance(value, list):
+                    raise ValueError(f'{location}.safety_weights must be a JSON array')
+                continue
+            if name == 'capability_lookahead' and value is None:
+                continue
         if (cls is PendingAwareGraduatedPolicy and
                 name in ('capability_lookahead', 'safety_lookahead') and value is None):
             continue
@@ -133,7 +147,7 @@ def reject_constant(value):
 
 
 def apply_overrides(document, specifications):
-    """Return a separate input copy and ordered audit records for scalar overrides."""
+    """Scalar overrides plus JSON arrays only for safety_weights."""
     effective = deepcopy(document)
     records = []
     seen = set()
@@ -152,17 +166,21 @@ def apply_overrides(document, specifications):
             original = original[part]
             target = target[part]
         leaf = parts[-1]
+        weights_path = path in ('policies.a.parameters.safety_weights',
+                                'policies.b.parameters.safety_weights')
         default_delay = (parts[:-1] == ['model'] and leaf in (
             'capability_delay_a', 'safety_delay_a', 'capability_delay_b', 'safety_delay_b'))
         if not isinstance(original, dict) or (leaf not in original and not default_delay):
             raise ValueError(f'--set: unknown path: {path}')
-        if isinstance(original.get(leaf), (dict, list)):
+        if isinstance(original.get(leaf), (dict, list)) and not weights_path:
             raise ValueError(f'--set {path}: target must be an existing scalar field')
         try:
             value = json.loads(raw_value, parse_constant=reject_constant)
         except ValueError as error:
             raise ValueError(f'--set {path}: invalid JSON value: {error}') from error
-        if isinstance(value, (dict, list)):
+        if weights_path and not isinstance(value, list):
+            raise ValueError(f'--set {path}: safety_weights must be a JSON array')
+        if isinstance(value, (dict, list)) and not (weights_path and isinstance(value, list)):
             raise ValueError(f'--set {path}: value must be a JSON scalar')
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f'--set {path}: number must be finite')
@@ -309,6 +327,8 @@ def resolve_experiments(document, common, rows):
     for index, row in enumerate(rows, 1):
         try:
             _, varied = apply_overrides(document, row)
+            if any(isinstance(record['value'], list) for record in varied):
+                raise ValueError('array-valued sweeps are unsupported; use separate --set invocations')
             overlap = fixed_paths & {record['path'] for record in varied}
             if overlap:
                 raise ValueError(f'paths specified in both --set and sweep: {sorted(overlap)}')

@@ -254,3 +254,75 @@ scientific model IDs, behavior IDs, and observation IDs stay unchanged. Metadata
 places the two definitions under full_trajectories.decision_gap_definitions and
 explicitly notes that the other file schemas retain schema-3 columns. Historical
 metadata/output files are not rewritten. This is instrumentation, not a new model.
+
+
+## Pending-weighted graduated policy (FG-M007)
+
+`PendingWeightedGraduatedPolicy`, JSON type `pending_weighted_graduated`, is a
+separate policy hypothesis about how to value pending safety. It does not correct
+an error in PendingAwareGraduatedPolicy or establish that averaging is better.
+All existing policies, observations, transitions, arrival timing, physical gap,
+catastrophe calculation, and random-number consumption remain unchanged.
+
+Parameters: base_allocation=.6, deficit_response=.1, safety_response=.2,
+capability_lookahead=None, safety_weights=(). The capability window retains the
+pending-aware semantics and per-lab summation: None ignores it; integer k >= 0
+includes records with t <= arrival_period <= t+k for both labs. Effective capability
+alone still determines the deficit. There is no safety_lookahead parameter;
+passing it fails validation.
+
+For decision period t and weights w indexed from zero:
+
+```text
+S_anticipated = S_effective + sum_j w[j] * (S_A_due_at_t+j + S_B_due_at_t+j)
+G_anticipated = max(0, max(C_own_anticipated, C_opponent_anticipated) - S_anticipated)
+allocation = clip(base_allocation
+                  + deficit_response * (C_opponent_effective - C_own_effective)
+                  - safety_response * G_anticipated, 0, 1)
+```
+
+Weights apply only to pending safety, never effective safety. Missing periods
+contribute zero; past arrivals and arrivals beyond the vector receive no credit.
+The window is not capped at the horizon. No future investments or arrivals are
+invented. Pending amounts already contain their realized investment-time production.
+
+- [] ignores pending safety; [0,0] does too.
+- [1] credits due-now safety; [1,0] is equivalent.
+- [1,1] credits due-now and next-period safety fully.
+- [.5,.5] averages these two arrival totals.
+- [1,.5] credits due-now fully and next-period by half.
+
+Weights need not sum to one. Accept a sequence of finite real numbers in [0,1],
+rejecting booleans, strings, null entries, negative/above-one values, NaN, infinity,
+and nested containers. Policy construction copies weights to an immutable tuple
+of floats. JSON config and --set use arrays; normalized provenance serializes them
+as arrays. Empty/all-zero vectors require no safety schedules. Any positive weight
+requires both labs' schedules, even if no arrival falls in its window; unavailable
+is an error, while known-empty is valid. Capability requirements remain independent.
+
+The inherited graduated allocation method calls this policy's pure decision_gap,
+so optional full traces record exactly the weighted gap used for allocation.
+No extra allocation calls, diagnostic state, or random draws are introduced.
+Per-lab safety sums preserve exact unit-window equivalence to existing pending-aware
+settings. Physical safety protects only after arrival; weighted credit is a policy
+measure, not hazard prediction, optimization, or proof an action prevents catastrophe.
+
+Any run containing this class is FG-M007. With any positive safety weight or enabled
+capability window, behavior_model_id is FG-M007 (including unit-weight special cases).
+When it ignores both pending categories, ordinary graduated behavior applies; the
+other player's active policy can still determine FG-M006 behavior. Otherwise the
+existing FG-M003 zero-delay / FG-M004 delayed classification applies. Existing policy
+families keep their IDs. Current output schema remains 4, metadata schema 1, and
+observation ID exact-pending-pre-decision-v1. Earlier schema-3 passages above describe
+prior additions; only optional full traces contain decision_gap_a/b. Episode,
+summary, and illustrative schemas remain unchanged.
+
+Use the pending_weighted_graduated.json example for separate vector invocations:
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/pending_weighted_graduated.json --set "policies.b.parameters.safety_weights=[1,0.5]"
+```
+
+This is a research command for user review, not executed by this implementation.
+The --set array exception is limited to the two safety_weights parameter paths;
+other overrides remain scalar. Array-valued CLI/CSV sweeps are unsupported.

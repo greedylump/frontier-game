@@ -366,3 +366,28 @@ or a counterfactual outcome. Fixed/unsupported policies export blank values.
 `episodes.csv`, `summary.csv`, and illustrative `trajectory.csv` are unchanged.
 Full tracing remains optional/off. See [model.md](../../docs/model.md) for semantics
 and the pure optional diagnostic interface. Model IDs and metadata schema are unchanged.
+
+
+### Weighted pending safety (FG-M007)
+
+`pending_weighted_graduated` keeps the graduated coefficients and capability
+lookahead, replacing safety_lookahead with safety_weights. At decision t, vector
+entry j weights both labs' safety due at t+j. [] or all zeros ignores pending safety;
+[1] counts due-now, [1,1] fully counts two periods, [.5,.5] averages their totals,
+and [1,.5] halves next-period credit. Effective safety is never weighted. Windows
+are not capped at the horizon; positive weights require both safety schedules.
+Finite numeric weights must lie in [0,1], without requiring a unit sum. Arrays are
+normalized to immutable tuples internally and JSON arrays in provenance.
+
+Example research invocation for review only (not executed):
+
+```powershell
+.\.venv\Scripts\python.exe experiments/laptop/run_experiment.py --config experiments/laptop/configs/pending_weighted_graduated.json
+```
+
+Override a vector with `--set "policies.b.parameters.safety_weights=[1,0.5]"`.
+Other parameters retain scalar overrides; do not use array-valued sweeps. Add
+--dry-run to inspect resolved settings without simulation. Full traces remain off
+unless --save-trajectories is supplied, and existing decision_gap fields then
+report weighted policy measures. Output schema 4 and other file schemas are unchanged.
+Averaging is an untested policy hypothesis; actual protection still requires arrival.

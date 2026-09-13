@@ -27,6 +27,7 @@ identification of affected runs, even if the intended scientific model is unchan
 | FG-M004 | Delayed capability and shared-safety production | Implemented; verification only, no research runs authorized | FG-M003 | Lab-specific investment-to-effect delays and unfinished production |
 | FG-M005 | Exact pending-work observations | Implemented; verification only | FG-M004 | Exposes realized pending schedules and configured delays through immutable observations |
 | FG-M006 | Pending-aware graduated measure | Implemented; verification only | FG-M005 | Independent capability/safety lookahead windows in a prescribed policy gap |
+| FG-M007 | Pending safety weighted by arrival offset | Implemented; verification only | FG-M006 | Prescribed independent weight per pending-safety arrival offset |
 
 Allocate the next unused model ID only when a further scientific change is actually implemented.
 Do not preassign IDs to a roadmap that may change. For each new model add purpose,
@@ -375,3 +376,34 @@ Pure policy calculations are shared with allocation rules, with no new allocatio
 calls, mutable last-decision state, or random draws. See model.md for the optional
 interface and file boundaries. Historical outputs/classifications are untouched.
 Only tiny temporary verification runs are authorized for this instrumentation.
+
+
+## FG-M007: weighted pending safety credit
+
+Purpose: test a new hypothesis about a policy's valuation of pending safety.
+Parent FG-M006. PendingWeightedGraduatedPolicy replaces safety_lookahead with an
+immutable finite [0,1] safety_weights vector indexed by arrival_period-current_period.
+The default empty vector ignores safety schedules; any positive weight requires
+both producing labs' schedules. Effective safety is never weighted. Missing and
+out-of-window arrivals contribute zero; the horizon does not truncate the window.
+See model.md for the exact equation, validation, and representative vectors.
+
+Retained: graduated coefficients and effective-stock deficit, capability lookahead
+semantics/summation, perfect immutable observations, physical timing and hazard,
+terminal payoffs, and RNG use. Existing policies remain unchanged. This is neither
+a claim that averaging improves outcomes nor a correction to the existing policy.
+
+Any pair containing the new family uses model_id FG-M007. Enabled capability
+lookahead or positive safety credit gives behavior_model_id FG-M007, including
+unit-vector cases mathematically equivalent to older windows. Empty/all-zero weights
+with capability_lookahead=None reproduce graduated behavior: existing pair-level
+FG-M003/FG-M004 rules apply unless the other player's active FG-M006 rule takes
+precedence. Old policy families retain their classifications; no historical metadata
+is relabeled. Output schema 4, metadata schema 1, observation ID, and file boundaries
+remain unchanged. decision_gap_a/b automatically use the weighted calculation.
+
+Implementation: uncommitted changes based on 3da26a6ab7dcec3321aa8e84da4c07a6c84e4e3e.
+No implementation commit or new research run is claimed. Example:
+experiments/laptop/configs/pending_weighted_graduated.json. Limits remain prescribed
+credit rather than planning, exact information, no future actions/shocks, and no
+physical safety protection before arrival. Only tiny temporary verification runs.

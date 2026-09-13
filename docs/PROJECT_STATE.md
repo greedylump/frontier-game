@@ -504,3 +504,53 @@ fixed/custom blanks, unchanged outcomes/original trace fields/RNG state, no hist
 state leakage, and file boundaries. Matched temporary runs produced byte-identical
 episode, summary, and illustrative CSVs with full tracing on/off. No compression
 or storage-overhead measurement was performed. Changes remain uncommitted.
+
+
+## PendingWeightedGraduatedPolicy implemented (FG-M007)
+
+Separate policy pending_weighted_graduated adds safety_weights instead of
+safety_lookahead. Weight j credits both labs' pending safety arriving at t+j;
+effective safety stays fully counted. The anticipated safety is S + sum_j w[j]
+*(S_A_due_t+j+S_B_due_t+j). The anticipated capability and effective-capability
+deficit follow the existing pending-aware/graduated rules. Allocation clips
+base + deficit_response*(C_opponent-C_own) - safety_response*anticipated_gap.
+
+Weights default empty, are copied to immutable floats, and must be finite numeric
+values in [0,1], excluding booleans/strings/null entries. They need not sum to one.
+[1] and [1,0] equal safety lookahead 0; [1,1] equals lookahead 1; [] and all-zero
+vectors ignore safety and need no schedules. [.5,.5] averages due-now/next totals.
+Positive weights require both safety schedules; unavailable is not known-empty.
+Capability requirements remain controlled by capability_lookahead. Missing/past/
+out-of-window arrivals get no credit; beyond-horizon arrivals within the vector do.
+Physical protection still starts only at arrival. No other policy or engine changed.
+
+The example uses physical delays (1,2) for both labs; A remains pending-aware with
+base .6, deficit .1, safety .05, both windows null. B is weighted with base .6,
+deficit .1, safety 10, capability window 1, safety_weights [.5,.5]. Other settings,
+trials, and seed match the existing pending-aware example. JSON config and quoted
+--set accept arrays only for safety_weights. No array sweeps are introduced; compare
+vectors with separate invocations. Resolved config/provenance include normalized
+weights, and optional full-trace decision gaps use the allocation's pure calculation.
+
+FG-M007 identifies the new family. Its active pending behavior is FG-M007, while
+ignore mode retains previous compatible pair-level behavior IDs. Existing policy
+IDs are unchanged. Schema 4 remains current; earlier schema-3 passages in the
+historical notes refer to prior additions, not the current full-trace contract.
+The earlier discussion plans are proposals, not authorization for this task.
+
+This is a new scientific hypothesis, not evidence of improvement or a coding-error
+fix. Research runs remain a separate user action. No research command was executed,
+no results changed, and source remains uncommitted for review.
+
+
+Weighted-policy verification: all 679 tests passed with `python -m pytest -q
+--basetemp .pytest-tmp-weighted-full`. After the explicit array-sweep rejection,
+133 weighted-policy/override/sweep tests passed with `python -m pytest
+tests/test_weighted_policy.py tests/test_experiment_overrides.py
+tests/test_experiment_sweeps.py -q --basetemp .pytest-tmp-weighted-final`.
+`git diff --check` passed. Exact unit-window equivalence covers deterministic and
+noisy small episodes, complete traces (including optional decision gaps), outcomes,
+and final RNG state. Hand-calculated credit, information requirements, immutability,
+invalid settings/preflight, normalized provenance, and scalar-parser boundaries
+also passed. No unresolved implementation issue was found; research efficacy is
+untested. Only tiny temporary verification outputs were generated.
