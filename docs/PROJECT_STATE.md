@@ -1,5 +1,14 @@
 # Frontier Game: project state and handoff
 
+> **Current resumption update (2026-09-14):** Read
+> [RESEARCH_HANDOFF_2026-09-14.md](RESEARCH_HANDOFF_2026-09-14.md) first.
+> It records completed delay, pending-aware, weighted-policy, and matched-trajectory
+> experiments, unresolved scientific decisions, and machine-transfer requirements.
+> Below, statements that those experiments are pending or implementations remain
+> uncommitted are historical task snapshots, not current status. FG-M007 research
+> completed at commit ee12562. The dated handoff explicitly identifies the conflicts;
+> it does not authorize additional research runs.
+
 Prepared from the research conversation and saved results through run
 `sweep-20260911T180613122294Z`, plus the delay and pending-work observation implementations.
 Read this first when resuming, then consult `MODEL_REGISTER.md`, source, and run

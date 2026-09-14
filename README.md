@@ -31,6 +31,12 @@ Try `--a 0.4 --b 0.4`, then `--a 0.8 --b 0.8`. See `--help` for all flags.
 
 ## Where to read and work
 
+**Resuming on another machine:** start with the
+[2026-09-14 research handoff](docs/RESEARCH_HANDOFF_2026-09-14.md).
+It preserves later research results, scientific decisions, and future plans from
+the discussion. Raw `results/` and generated `outputs/` are ignored by Git and
+must be transferred separately if needed; a clone does not include that evidence.
+
 - `src/frontier_game/model.py`: parameters, immutable observations, policies, one episode.
 - `src/frontier_game/monte_carlo.py`: independent replications and uncertainty.
 - `src/frontier_game/cli.py`: experiment outputs.

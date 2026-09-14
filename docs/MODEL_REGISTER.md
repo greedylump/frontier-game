@@ -380,6 +380,13 @@ Only tiny temporary verification runs are authorized for this instrumentation.
 
 ## FG-M007: weighted pending safety credit
 
+Current evidence update (2026-09-14): implementation was committed as
+ee125620460396d3c9c54bb8fac7025da05a2dff, and weighted research sweeps plus
+matched-trajectory replays have completed. See
+[the dated research handoff](RESEARCH_HANDOFF_2026-09-14.md) for results and run IDs,
+including FG-M006 and delay follow-ups. The implementation-only status at the end
+of this entry and older entries is historical, not a claim that research is unrun.
+
 Purpose: test a new hypothesis about a policy's valuation of pending safety.
 Parent FG-M006. PendingWeightedGraduatedPolicy replaces safety_lookahead with an
 immutable finite [0,1] safety_weights vector indexed by arrival_period-current_period.
